@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TRUSTON — Arise Capital | Inventory & Cost Sheet System</title>
+<link rel="icon" href="data:," />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-title">TRUSTON</div>
+      <div class="login-subtitle">Arise Capital · Sr. No. 130, Wakad, Pune</div>
+    </div>
+
+    <!-- Sign In (default view) -->
+    <div id="signInView">
+      <h2>Sign in</h2>
+      <div id="loginError" class="error-msg" style="display:none;"></div>
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="username" />
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+      <button id="loginBtn" class="btn btn-primary btn-block">Sign In</button>
+      <div class="login-hint">Access is provisioned by your admin. Contact them if you don't have credentials.</div>
+      <div id="bootstrapHint" class="login-hint" style="display:none;">
+        No admin account exists yet. <a href="#" id="showSignUpLink">Create the first admin account →</a>
+      </div>
+    </div>
+
+    <!-- Bootstrap Sign Up (only shown when no accounts exist at all) -->
+    <div id="signUpView" style="display:none;">
+      <h2>Create Admin Account</h2>
+      <div class="login-hint" style="margin:0 0 12px;">This system has no admin yet. The account you create here automatically becomes the admin.</div>
+      <div id="signUpError" class="error-msg" style="display:none;"></div>
+      <label>Full Name</label>
+      <input type="text" id="signUpName" placeholder="Your name" />
+      <label>Email</label>
+      <input type="email" id="signUpEmail" placeholder="you@company.com" autocomplete="username" />
+      <label>Password</label>
+      <input type="password" id="signUpPassword" placeholder="Minimum 6 characters" autocomplete="new-password" />
+      <button id="signUpBtn" class="btn btn-primary btn-block">Create Admin Account</button>
+      <div class="login-hint"><a href="#" id="backToSignInLink">← Back to sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="appShell" class="app-shell" style="display:none;">
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="topbar-title">TRUSTON <span>Arise Capital</span></div>
+      <div class="topbar-sub">Sr. No. 130, Wakad, Pune · RERA: <span id="reraNoTop"></span></div>
+    </div>
+    <div class="topbar-actions">
+      <span id="userBadge" class="user-badge"></span>
+      <button id="viewBookingsBtn" class="btn btn-outline" style="display:none;">📋 Bookings</button>
+      <button id="manageUsersBtn" class="btn btn-outline" style="display:none;">👤 Manage Users</button>
+      <button id="auditLogBtn" class="btn btn-outline" style="display:none;">🕒 Audit Log</button>
+      <button id="exportExcelBtn" class="btn btn-outline" style="display:none;">⬇ Export Excel</button>
+      <button id="resetSystemBtn" class="btn btn-outline" style="display:none;border-color:#b23b3b;color:#b23b3b;">⟲ Reset System</button>
+      <button id="changePasswordBtn" class="btn btn-ghost">Change Password</button>
+      <button id="logoutBtn" class="btn btn-ghost">Logout</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <aside class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Category</div>
+        <div id="categoryTabs" class="category-tabs"></div>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Floor</div>
+        <select id="floorFilter"><option value="">All Floors</option></select>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Status</div>
+        <select id="statusFilter">
+          <option value="">All</option>
+          <option value="available">Available</option>
+          <option value="on_hold">On Hold</option>
+          <option value="sold">Sold</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </div>
+      <div class="sidebar-section" id="statsBox">
+        <div class="sidebar-label">Summary</div>
+        <div id="statsContent" class="stats-content"></div>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div id="unitGrid" class="unit-grid"></div>
+    </main>
+
+    <aside class="detail-panel" id="detailPanel">
+      <div class="detail-empty" id="detailEmpty">Select a unit to view details</div>
+      <div id="detailContent" style="display:none;"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- ================= BOOKING MODAL ================= -->
+<div id="bookingModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Create Booking / Cost Sheet</h3>
+      <button class="modal-close" id="closeBookingModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="bookingUnitSummary" class="booking-unit-summary"></div>
+      <label>Customer Name <span class="required">*</span></label>
+      <input type="text" id="custName" placeholder="Full name as per PAN/Aadhaar" />
+      <label>Phone</label>
+      <input type="text" id="custPhone" placeholder="Contact number" />
+      <label>Email</label>
+      <input type="email" id="custEmail" placeholder="Email address" />
+      <div id="adminPriceOverride" style="display:none;">
+        <hr/>
+        <label>Override Agreement Value (Admin only, optional)</label>
+        <input type="number" id="overrideAgreement" placeholder="Leave blank to use standard price" />
+      </div>
+      <div id="bookingError" class="error-msg" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelBookingBtn">Cancel</button>
+      <button class="btn btn-outline" id="previewPdfBtn">Preview Cost Sheet (no booking)</button>
+      <button class="btn btn-primary" id="confirmBookingBtn">Confirm Booking & Download PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MANAGE USERS MODAL (admin only) ================= -->
+<div id="usersModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="width:560px;">
+    <div class="modal-header">
+      <h3>Manage Users</h3>
+      <button class="modal-close" id="closeUsersModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <button class="btn btn-primary btn-block" id="openAddUserBtn" style="margin-bottom:14px;">+ Add New User</button>
+      <div id="usersList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADD USER MODAL (admin only) ================= -->
+<div id="addUserModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Add New User</h3>
+      <button class="modal-close" id="closeAddUserModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="addUserError" class="error-msg" style="display:none;"></div>
+      <label>Full Name</label>
+      <input type="text" id="newUserName" placeholder="Full name" />
+      <label>Email</label>
+      <input type="email" id="newUserEmail" placeholder="user@company.com" />
+      <label>Temporary Password</label>
+      <input type="text" id="newUserPassword" placeholder="Minimum 6 characters" />
+      <label>Role</label>
+      <select id="newUserRole">
+        <option value="sales">Sales</option>
+        <option value="site_head">Site Head</option>
+        <option value="admin">Admin</option>
+      </select>
+      <div class="login-hint" style="margin-top:8px;">Share this email/password with the user directly — they can change their password after logging in via "Change Password".</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelAddUserBtn">Cancel</button>
+      <button class="btn btn-primary" id="confirmAddUserBtn">Create User</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CHANGE PASSWORD MODAL ================= -->
+<div id="changePasswordModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Change Password</h3>
+      <button class="modal-close" id="closeChangePasswordModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="changePasswordError" class="error-msg" style="display:none;"></div>
+      <label>New Password</label>
+      <input type="password" id="newPassword" placeholder="Minimum 6 characters" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelChangePasswordBtn">Cancel</button>
+      <button class="btn btn-primary" id="confirmChangePasswordBtn">Update Password</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= BOOKINGS MODAL (Admin + Site Head) ================= -->
+<div id="bookingsListModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="width:720px;">
+    <div class="modal-header">
+      <h3>Bookings</h3>
+      <button class="modal-close" id="closeBookingsListModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="bookingsList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= EDIT BOOKING MODAL (Admin + Site Head) ================= -->
+<div id="editBookingModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Edit Booking</h3>
+      <button class="modal-close" id="closeEditBookingModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="editBookingError" class="error-msg" style="display:none;"></div>
+      <label>Customer Name</label>
+      <input type="text" id="editCustName" />
+      <label>Phone</label>
+      <input type="text" id="editCustPhone" />
+      <label>Email</label>
+      <input type="email" id="editCustEmail" />
+      <label>Agreement Value</label>
+      <input type="number" id="editAgreement" />
+      <label>Stamp Duty</label>
+      <input type="number" id="editStampDuty" />
+      <label>Registration</label>
+      <input type="number" id="editRegistration" />
+      <label>GST</label>
+      <input type="number" id="editGst" />
+      <label>Total Package</label>
+      <input type="number" id="editPackage" />
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelEditBookingBtn">Cancel</button>
+      <button class="btn btn-primary" id="confirmEditBookingBtn">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= AUDIT LOG MODAL (Admin only) ================= -->
+<div id="auditLogModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box" style="width:760px;">
+    <div class="modal-header">
+      <h3>Audit Log</h3>
+      <button class="modal-close" id="closeAuditLogModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="auditLogList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= RESET SYSTEM CONFIRM MODAL (Admin only) ================= -->
+<div id="resetSystemModal" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="color:#b23b3b;">⚠ Reset Entire System</h3>
+      <button class="modal-close" id="closeResetSystemModal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;">This will set <b>every unit back to Available</b> and <b>cancel every active booking</b>. This cannot be undone (though it is logged in the Audit Log). Type <code>RESET</code> below to confirm.</p>
+      <input type="text" id="resetConfirmText" placeholder="Type RESET to confirm" />
+      <div id="resetSystemError" class="error-msg" style="display:none;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="cancelResetSystemBtn">Cancel</button>
+      <button class="btn btn-primary" id="confirmResetSystemBtn" style="background:#b23b3b;">Reset System</button>
+    </div>
+  </div>
+</div>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
