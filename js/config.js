@@ -3,8 +3,8 @@
 // Fill in your Supabase credentials below (Settings → API in Supabase).
 // =====================================================================
 
-const SUPABASE_URL = "YOUR_SUPABASE_URL_HERE";
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
+const SUPABASE_URL = "https://ztqitrdjbieaigkjnrko.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0cWl0cmRqYmllYWlna2pucmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NDAyMDEsImV4cCI6MjA5OTUxNjIwMX0.yRbcBJmBiNk-DQUn0nXnBI4SdxmG2ssEAj7YaHtgXUI";
 
 const PROJECT_NAME = "TRUSTON";
 const PROJECT_SUBTITLE = "Arise Capital";
