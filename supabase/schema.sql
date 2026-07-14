@@ -26,6 +26,7 @@ drop function if exists public.edit_booking(uuid, text, text, text, numeric, num
 drop function if exists public.admin_cancel_booking(uuid) cascade;
 drop function if exists public.admin_reset_all_units() cascade;
 drop function if exists public.admin_set_user_role(uuid, text) cascade;
+drop function if exists public.admin_set_user_disabled(uuid, boolean) cascade;
 
 drop table if exists public.audit_log cascade;
 drop table if exists public.bookings cascade;
@@ -48,6 +49,7 @@ create table public.profiles (
   email text not null default '',
   full_name text not null default '',
   role text not null default 'sales' check (role in ('admin','site_head','sales')),
+  is_disabled boolean not null default false,
   created_at timestamptz not null default now()
 );
 
@@ -616,3 +618,46 @@ end;
 $$;
 
 grant execute on function public.admin_set_user_role(uuid, text) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 15) ADMIN: disable/re-enable a user ("Remove User")
+--     NOTE: this is a static frontend using only the anon key — there is
+--     no Edge Function or service-role key anywhere in this system, so
+--     we cannot call the Supabase Admin API to hard-delete an auth.users
+--     row from the client. Disabling is the safe equivalent: the account
+--     still exists, but the app checks is_disabled right after login and
+--     immediately signs them back out, so a disabled user has no access.
+--     To permanently delete the underlying auth account, do it once from
+--     Supabase Dashboard → Authentication → Users → delete (or run
+--     `delete from auth.users where id = '...'` in the SQL Editor).
+-- ---------------------------------------------------------------------
+create or replace function public.admin_set_user_disabled(p_user_id uuid, p_disabled boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_target_name text;
+begin
+  if not public.is_admin() then
+    raise exception 'Only admin can disable/enable users';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception 'You cannot disable your own account';
+  end if;
+
+  select full_name into v_target_name from public.profiles where id = p_user_id;
+
+  update public.profiles set is_disabled = p_disabled where id = p_user_id;
+
+  perform public.internal_log_audit(
+    case when p_disabled then 'user_disabled' else 'user_enabled' end,
+    'profiles', p_user_id::text,
+    format('%s was %s', v_target_name, case when p_disabled then 'removed (disabled)' else 're-enabled' end),
+    jsonb_build_object('is_disabled', not p_disabled), jsonb_build_object('is_disabled', p_disabled)
+  );
+end;
+$$;
+
+grant execute on function public.admin_set_user_disabled(uuid, boolean) to authenticated;

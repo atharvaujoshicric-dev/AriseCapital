@@ -112,11 +112,18 @@ document.getElementById("logoutBtn").addEventListener("click", async () => {
 async function loadProfileAndEnter() {
   const { data: profile, error } = await sb
     .from("profiles")
-    .select("id, email, full_name, role")
+    .select("id, email, full_name, role, is_disabled")
     .eq("id", currentUser.id)
     .single();
 
   if (error) { showLoginError("Could not load your profile: " + error.message); return; }
+
+  if (profile.is_disabled) {
+    await sb.auth.signOut();
+    showLoginError("This account has been disabled by an admin. Contact your admin if this is unexpected.");
+    return;
+  }
+
   currentProfile = profile;
 
   document.getElementById("loginScreen").style.display = "none";
@@ -252,18 +259,20 @@ function renderDetail() {
   `;
 
   if (isAdmin) {
+    const impliedRate = u.agreement_value > 0 ? Math.round((u.stamp_duty / u.agreement_value) * 100) : 7;
+    const rateIsSix = impliedRate === 6;
     html += `
       <div class="detail-edit-row"><span>Agreement Value</span><input type="number" id="detAgreementValue" value="${u.agreement_value}"></div>
       <div class="detail-edit-row"><span>Stamp Duty Rate</span>
         <select id="detStampDutyRate">
-          <option value="7">7%</option>
-          <option value="6">6% (concessional)</option>
+          <option value="7" ${!rateIsSix ? "selected" : ""}>7% (Male / Others)</option>
+          <option value="6" ${rateIsSix ? "selected" : ""}>6% (Female Sole Owner)</option>
         </select>
       </div>
-      <div class="detail-edit-row"><span>Stamp Duty</span><input type="number" id="detStampDuty" value="${u.stamp_duty}"></div>
-      <div class="detail-edit-row"><span>Registration</span><input type="number" id="detRegistration" value="${u.registration}"></div>
-      <div class="detail-edit-row"><span>GST</span><input type="number" id="detGst" value="${u.gst}"></div>
-      <div class="detail-edit-row"><span>Total Package</span><input type="number" id="detPackage" value="${u.package}"></div>
+      <div class="detail-row"><span>Stamp Duty</span><b id="detStampDutyDisplay">₹${fmtNum(u.stamp_duty)}</b></div>
+      <div class="detail-row"><span>Registration <span class="field-note">(fixed)</span></span><b>₹${fmtNum(REGISTRATION_FEE)}</b></div>
+      <div class="detail-row"><span>GST <span class="field-note">(12%)</span></span><b id="detGstDisplay">₹${fmtNum(u.gst)}</b></div>
+      <div class="detail-row"><span>Total Package</span><b id="detPackageDisplay">₹${fmtNum(u.package)}</b></div>
       <button class="btn btn-outline btn-sm btn-block" style="margin-top:8px;" onclick="saveUnitPrice()">💾 Save Price Changes</button>
     `;
   } else {
@@ -313,23 +322,47 @@ function renderDetail() {
   box.innerHTML = html;
 
   if (isAdmin) {
-    wireFinancialsRecalc({
-      agreement: "detAgreementValue", rate: "detStampDutyRate", stamp: "detStampDuty",
-      registration: "detRegistration", gst: "detGst", package: "detPackage"
-    });
+    wireUnitPriceRecalc();
   }
+}
+
+// Only Agreement Value and Stamp Duty Rate are true inputs here — Stamp
+// Duty, GST, and the Package total are always derived from them, and
+// Registration is a fixed statutory fee. This is one-directional on
+// purpose: it must not be possible to back into an arbitrary stamp duty
+// by typing a package total, the way the booking-time calculator allows.
+function wireUnitPriceRecalc() {
+  const agreementEl = document.getElementById("detAgreementValue");
+  const rateEl = document.getElementById("detStampDutyRate");
+  const stampDisplay = document.getElementById("detStampDutyDisplay");
+  const gstDisplay = document.getElementById("detGstDisplay");
+  const pkgDisplay = document.getElementById("detPackageDisplay");
+
+  function recalc() {
+    const av = Number(agreementEl.value || 0);
+    const rate = Number(rateEl.value || 7);
+    const stamp = Math.round(av * rate / 100);
+    const gst = Math.round(av * GST_RATE);
+    const pkg = av + stamp + REGISTRATION_FEE + gst;
+    stampDisplay.textContent = "₹" + fmtNum(stamp);
+    gstDisplay.textContent = "₹" + fmtNum(gst);
+    pkgDisplay.textContent = "₹" + fmtNum(pkg);
+  }
+
+  agreementEl.oninput = recalc;
+  rateEl.onchange = recalc;
 }
 
 async function saveUnitPrice() {
   const agreement = Number(document.getElementById("detAgreementValue").value || 0);
-  const stamp = Number(document.getElementById("detStampDuty").value || 0);
-  const reg = Number(document.getElementById("detRegistration").value || 0);
-  const gst = Number(document.getElementById("detGst").value || 0);
-  const pkg = Number(document.getElementById("detPackage").value || 0);
+  const rate = Number(document.getElementById("detStampDutyRate").value || 7);
+  const stamp = Math.round(agreement * rate / 100);
+  const gst = Math.round(agreement * GST_RATE);
+  const pkg = agreement + stamp + REGISTRATION_FEE + gst;
 
   const { error } = await sb.rpc("admin_update_unit_price", {
     p_unit_id: selectedUnit.id, p_agreement_value: agreement, p_stamp_duty: stamp,
-    p_registration: reg, p_gst: gst, p_package: pkg
+    p_registration: REGISTRATION_FEE, p_gst: gst, p_package: pkg
   });
 
   if (error) { alert("Error: " + error.message); return; }
@@ -365,9 +398,15 @@ async function refreshAfterAction() {
 let previewOnlyMode = false;
 
 const GST_RATE = 0.12; // 12% GST on commercial real estate agreement value
+const REGISTRATION_FEE = 30000; // fixed statutory registration fee, not editable anywhere
 
-// Wires up live recalculation for a given set of field IDs (used for both
-// the booking modal and the edit modal, which have different id prefixes).
+// One-directional financial recalculation: Agreement Value + Stamp Duty
+// Rate are the only real inputs anywhere in this app. Stamp Duty, GST, and
+// Package are always derived from them, and Registration is always the
+// fixed fee — never editable, never something to back-calculate into.
+// `stampEl`/`gstEl`/`pkgEl` may be <input readonly> (booking-time display,
+// value written directly) so this works for both that case and detail-row
+// <b> elements (handled separately via wireUnitPriceRecalc).
 function wireFinancialsRecalc(ids) {
   const agreementEl = document.getElementById(ids.agreement);
   const rateEl = document.getElementById(ids.rate);
@@ -376,48 +415,20 @@ function wireFinancialsRecalc(ids) {
   const gstEl = document.getElementById(ids.gst);
   const pkgEl = document.getElementById(ids.package);
 
-  function recalcFromAgreementValue() {
+  function recalc() {
     const av = Number(agreementEl.value || 0);
     const rate = Number(rateEl.value || 7);
-    stampEl.value = Math.round(av * rate / 100);
-    gstEl.value = Math.round(av * GST_RATE);
-    recalcPackageFromComponents();
-  }
-  function recalcPackageFromComponents() {
-    const av = Number(agreementEl.value || 0);
-    const stamp = Number(stampEl.value || 0);
-    const reg = Number(regEl.value || 0);
-    const gst = Number(gstEl.value || 0);
-    pkgEl.value = av + stamp + reg + gst;
-  }
-  // Editing the Package directly solves backwards for what Agreement Value
-  // (and therefore Stamp Duty + GST, at the currently selected rate) would
-  // produce that package total: Package = AV*(1 + rate/100 + GST_RATE) + Registration.
-  function recalcFromPackage() {
-    const pkg = Number(pkgEl.value || 0);
-    const rate = Number(rateEl.value || 7);
-    const reg = Number(regEl.value || 0);
-    const av = Math.round((pkg - reg) / (1 + rate / 100 + GST_RATE));
-    agreementEl.value = av;
-    stampEl.value = Math.round(av * rate / 100);
-    gstEl.value = Math.round(av * GST_RATE);
-    // Leave pkgEl exactly as typed — small rounding differences (a few
-    // rupees) between components and the typed total are expected and fine.
+    const stamp = Math.round(av * rate / 100);
+    const gst = Math.round(av * GST_RATE);
+    stampEl.value = stamp;
+    regEl.value = REGISTRATION_FEE;
+    gstEl.value = gst;
+    pkgEl.value = av + stamp + REGISTRATION_FEE + gst;
   }
 
-  agreementEl.oninput = recalcFromAgreementValue;
-  rateEl.onchange = recalcFromAgreementValue;
-  stampEl.oninput = recalcPackageFromComponents;
-  regEl.oninput = recalcPackageFromComponents;
-  gstEl.oninput = recalcPackageFromComponents;
-  pkgEl.oninput = recalcFromPackage;
+  agreementEl.oninput = recalc;
+  rateEl.onchange = recalc;
 }
-
-const bookingFieldIds = {
-  agreement: "bkAgreementValue", rate: "bkStampDutyRate", stamp: "bkStampDuty",
-  registration: "bkRegistration", gst: "bkGst", package: "bkPackage"
-};
-wireFinancialsRecalc(bookingFieldIds);
 
 function openBookingModal(previewOnly) {
   previewOnlyMode = !!previewOnly;
@@ -440,9 +451,10 @@ function openBookingModal(previewOnly) {
   document.getElementById("paymentRefNo").value = "";
   document.getElementById("paymentPlan").value = "";
 
-  // Seed financials from the unit's standard pricing; all editable from here.
+  // Financials are fixed to the unit's current standing price — read-only here.
+  const impliedRate = u.agreement_value > 0 ? Math.round((u.stamp_duty / u.agreement_value) * 100) : 7;
   document.getElementById("bkAgreementValue").value = u.agreement_value;
-  document.getElementById("bkStampDutyRate").value = "7";
+  document.getElementById("bkStampDutyRate").value = impliedRate === 6 ? "6" : "7";
   document.getElementById("bkStampDuty").value = u.stamp_duty;
   document.getElementById("bkRegistration").value = u.registration;
   document.getElementById("bkGst").value = u.gst;
@@ -571,22 +583,27 @@ document.getElementById("manageUsersBtn").addEventListener("click", async () => 
 document.getElementById("closeUsersModal").onclick = () => document.getElementById("usersModal").style.display = "none";
 
 async function renderUsersList() {
-  const { data, error } = await sb.from("profiles").select("id, email, full_name, role").order("created_at");
+  const { data, error } = await sb.from("profiles").select("id, email, full_name, role, is_disabled").order("created_at");
   const listEl = document.getElementById("usersList");
   if (error) { listEl.innerHTML = `<div class="error-msg">Failed to load users: ${error.message}</div>`; return; }
 
   listEl.innerHTML = data.map(u => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);${u.is_disabled ? "opacity:0.5;" : ""}">
       <div>
-        <div style="font-weight:600;">${u.full_name || "(no name)"}</div>
+        <div style="font-weight:600;">${u.full_name || "(no name)"} ${u.is_disabled ? '<span style="color:#b23b3b;font-size:11px;">(REMOVED)</span>' : ""}</div>
         <div style="font-size:12px;color:#888;">${u.email}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;">
-        <select data-uid="${u.id}" class="role-select" ${u.id === currentUser.id ? "disabled title='You cannot change your own role'" : ""}>
+        <select data-uid="${u.id}" class="role-select" ${u.id === currentUser.id || u.is_disabled ? "disabled title='Cannot change'" : ""}>
           <option value="sales" ${u.role==="sales"?"selected":""}>Sales</option>
           <option value="site_head" ${u.role==="site_head"?"selected":""}>Site Head</option>
           <option value="admin" ${u.role==="admin"?"selected":""}>Admin</option>
         </select>
+        ${u.id === currentUser.id ? "" : (
+          u.is_disabled
+            ? `<button class="btn btn-outline btn-sm" data-uid="${u.id}" data-action="enable">Re-enable</button>`
+            : `<button class="btn btn-ghost btn-sm" style="color:#b23b3b;" data-uid="${u.id}" data-action="disable">Remove</button>`
+        )}
       </div>
     </div>
   `).join("");
@@ -597,6 +614,17 @@ async function renderUsersList() {
       const role = e.target.value;
       const { error } = await sb.rpc("admin_set_user_role", { p_user_id: uid, p_role: role });
       if (error) { alert("Error: " + error.message); await renderUsersList(); return; }
+      await renderUsersList();
+    });
+  });
+
+  listEl.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.getAttribute("data-uid");
+      const disable = btn.getAttribute("data-action") === "disable";
+      if (disable && !confirm("Remove this user? They will immediately lose access. Their account can be re-enabled later from this same screen.")) return;
+      const { error } = await sb.rpc("admin_set_user_disabled", { p_user_id: uid, p_disabled: disable });
+      if (error) { alert("Error: " + error.message); return; }
       await renderUsersList();
     });
   });

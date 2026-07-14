@@ -43,7 +43,7 @@ const FORM_CSS = `
   .check-row{ display:flex; flex-wrap:wrap; align-items:center; gap:34px; font-size:14px; margin-bottom:26px; }
   .check-item{ display:flex; align-items:center; gap:10px; }
   .checkbox{ width:17px; height:17px; border:1.5px solid var(--line); display:inline-block; position:relative; }
-  .checkbox.checked::after{ content:"\\2713"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:bold; }
+  .checkbox.checked::after{ content:""; position:absolute; left:-5px; top:-5px; right:-5px; bottom:-5px; background-image:url('CHECKMARK_DATA_URI'); background-repeat:no-repeat; background-position:center; background-size:contain; }
   .sign-row{ display:flex; justify-content:space-between; gap:80px; margin:70px 0 16px 0; position:relative; z-index:1; }
   .sign-block{ flex:1; text-align:center; }
   .sign-block .sign-line{ border-bottom:1px solid var(--line); height:54px; }
@@ -62,6 +62,16 @@ const FORM_CSS = `
   .payment-table th{ background:var(--brown); color:#fff; padding:8px; border:1px solid #ccc; text-align:left; }
   .payment-table td{ padding:7px 8px; border:1px solid #ddd; }
 `;
+
+function checkmarkDataURI() {
+  // Short stroke from inside the box down to a low point, then a longer
+  // stroke up past the box's top-right corner — mimics a natural
+  // handwritten tick rather than a centered, symmetric checkmark glyph.
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 27 27">
+    <path d="M6 14 L11 19 L22 4" stroke="#1A1A1A" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`;
+  return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
+}
 
 function ariseLogoDataURI() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="220" height="255" viewBox="0 0 220 255">
@@ -118,7 +128,7 @@ function formFooterHTML() {
 function formHeaderHTML(logoUri, qrUri) {
   return `
     <div class="header">
-      <div class="logo"><img src="${logoUri}" alt="Arise Capital"></div>
+      <div class="logo"><img src="assets/logo.png" onerror="this.onerror=null;this.src='${logoUri}'" alt="Arise Capital"></div>
       <div class="rera">
         <div class="rera-text">
           MAHA-RERA Registration No.<br>
@@ -166,13 +176,13 @@ function buildBookingFormHTML(unit, customerName, costs, extras, bookingId) {
 <head>
 <meta charset="UTF-8">
 <title>${PROJECT_NAME} - Booking / Allotment Form</title>
-<style>${FORM_CSS}</style>
+<style>${FORM_CSS.replace('CHECKMARK_DATA_URI', checkmarkDataURI())}</style>
 </head>
 <body>
 
   <!-- PAGE 1 -->
   <div class="page">
-    <div class="watermark"><img src="${logoUri}" alt=""></div>
+    <div class="watermark"><img src="assets/logo.png" onerror="this.onerror=null;this.src='${logoUri}'" alt=""></div>
     ${formHeaderHTML(logoUri, qrUri)}
     <div class="title-bar">OFFICIAL APPLICATION FOR BOOKING / ALLOTMENT</div>
 
@@ -224,7 +234,7 @@ function buildBookingFormHTML(unit, customerName, costs, extras, bookingId) {
 
   <!-- PAGE 2 -->
   <div class="page">
-    <div class="watermark"><img src="${logoUri}" alt=""></div>
+    <div class="watermark"><img src="assets/logo.png" onerror="this.onerror=null;this.src='${logoUri}'" alt=""></div>
     ${formHeaderHTML(logoUri, qrUri)}
     <div class="title-bar">OFFICIAL APPLICATION FOR BOOKING / ALLOTMENT</div>
 

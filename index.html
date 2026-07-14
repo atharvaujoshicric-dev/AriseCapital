@@ -95,6 +95,9 @@
     </aside>
 
     <main class="content">
+      <div id="contentWatermark" class="content-watermark">
+        <img src="assets/logo.png" alt="" id="contentWatermarkImg" onerror="this.onerror=null;this.src=ariseLogoDataURI();">
+      </div>
       <div id="unitGrid" class="unit-grid"></div>
     </main>
 
@@ -143,22 +146,23 @@
       <label>No. of Parking Spaces (if Covered)</label>
       <input type="number" id="parkingCount" placeholder="e.g. 1" min="0" />
 
-      <div class="form-section-label">3. Financials & Payment Details</div>
+      <div class="form-section-label">3. Financials &amp; Payment Details</div>
+      <div class="field-note" style="margin-bottom:8px;">These reflect the unit's current listed price and cannot be changed here. Admins can update a unit's standing price from its detail panel in the inventory grid.</div>
       <label>Basic Sale Price / Agreement Value (Rs)</label>
-      <input type="number" id="bkAgreementValue" />
+      <input type="number" id="bkAgreementValue" readonly />
       <label>Stamp Duty Rate</label>
-      <select id="bkStampDutyRate">
+      <select id="bkStampDutyRate" disabled>
         <option value="7">7% (Male / Others)</option>
         <option value="6">6% (Female Sole Owner — Concessional)</option>
       </select>
-      <label>Stamp Duty (Rs) <span class="field-note">— auto-calculated, editable</span></label>
-      <input type="number" id="bkStampDuty" />
-      <label>Registration (Rs)</label>
-      <input type="number" id="bkRegistration" />
-      <label>GST (Rs) <span class="field-note">— auto-calculated @ 12%, editable</span></label>
-      <input type="number" id="bkGst" />
-      <label>Total Package (Rs) <span class="field-note">— editing this recalculates Agreement Value/Stamp Duty/GST</span></label>
-      <input type="number" id="bkPackage" />
+      <label>Stamp Duty (Rs)</label>
+      <input type="number" id="bkStampDuty" readonly />
+      <label>Registration (Rs) — fixed</label>
+      <input type="number" id="bkRegistration" readonly />
+      <label>GST (Rs)</label>
+      <input type="number" id="bkGst" readonly />
+      <label>Total Package (Rs)</label>
+      <input type="number" id="bkPackage" readonly />
 
       <label>Booking Amount Paid (Rs)</label>
       <input type="number" id="bookingAmountPaid" placeholder="e.g. 500000" />
@@ -317,14 +321,14 @@
         <option value="7">7% (Male / Others)</option>
         <option value="6">6% (Female Sole Owner — Concessional)</option>
       </select>
-      <label>Stamp Duty <span class="field-note">— auto-calculated, editable</span></label>
-      <input type="number" id="editStampDuty" />
-      <label>Registration</label>
-      <input type="number" id="editRegistration" />
-      <label>GST <span class="field-note">— auto-calculated @ 12%, editable</span></label>
-      <input type="number" id="editGst" />
-      <label>Total Package <span class="field-note">— editing this recalculates Agreement Value/Stamp Duty/GST</span></label>
-      <input type="number" id="editPackage" />
+      <label>Stamp Duty</label>
+      <input type="number" id="editStampDuty" readonly />
+      <label>Registration — fixed</label>
+      <input type="number" id="editRegistration" readonly />
+      <label>GST (12%)</label>
+      <input type="number" id="editGst" readonly />
+      <label>Total Package</label>
+      <input type="number" id="editPackage" readonly />
       <label>Booking Amount Paid</label>
       <input type="number" id="editBookingAmountPaid" />
       <label>Payment Mode</label>
