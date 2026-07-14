@@ -34,6 +34,14 @@ drop table if exists public.profiles cascade;
 
 -- ---------------------------------------------------------------------
 -- 1) PROFILES — roles: admin, site_head, sales
+--    NOTE: RLS is enabled and the policy is created further down, AFTER
+--    the is_admin() helper exists (see section 3B). Creating the policy
+--    too early — or writing it as a raw subquery on profiles itself —
+--    causes "infinite recursion detected in policy for relation profiles",
+--    because a plain subquery re-triggers this same SELECT policy on
+--    itself. Routing the admin check through a SECURITY DEFINER function
+--    avoids that: the function runs as the table owner, which bypasses
+--    RLS entirely, so there's no self-reference.
 -- ---------------------------------------------------------------------
 create table public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -42,17 +50,6 @@ create table public.profiles (
   role text not null default 'sales' check (role in ('admin','site_head','sales')),
   created_at timestamptz not null default now()
 );
-
-alter table public.profiles enable row level security;
-
-create policy "profiles_select_own_or_admin"
-  on public.profiles for select
-  using (
-    auth.uid() = id
-    or exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'admin')
-  );
-
--- No direct UPDATE policy — role changes go only through admin_set_user_role().
 
 -- ---------------------------------------------------------------------
 -- 2) BOOTSTRAP TRIGGER — first person to ever sign up becomes admin.
@@ -84,7 +81,7 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 
 -- ---------------------------------------------------------------------
--- 3) HELPERS
+-- 3A) HELPERS (must exist before we create any policy that calls them)
 -- ---------------------------------------------------------------------
 create or replace function public.is_admin()
 returns boolean
@@ -118,6 +115,21 @@ as $$
 $$;
 
 grant execute on function public.needs_bootstrap() to anon, authenticated;
+
+-- ---------------------------------------------------------------------
+-- 3B) NOW enable RLS on profiles and create its policy, using is_admin()
+--     instead of a raw self-referencing subquery.
+-- ---------------------------------------------------------------------
+alter table public.profiles enable row level security;
+
+create policy "profiles_select_own_or_admin"
+  on public.profiles for select
+  using (
+    auth.uid() = id
+    or public.is_admin()
+  );
+
+-- No direct UPDATE policy — role changes go only through admin_set_user_role().
 
 -- ---------------------------------------------------------------------
 -- 4) AUDIT LOG — every sensitive write goes through internal_log_audit()
@@ -199,14 +211,37 @@ create policy "units_select_all_authenticated"
 create table public.bookings (
   id uuid primary key default gen_random_uuid(),
   unit_id text not null references public.units(id),
-  customer_name text not null,
-  customer_phone text,
-  customer_email text,
-  agreement_value numeric not null,
+
+  -- Section 1: Applicant Details
+  customer_name text not null,               -- Sole / First Applicant Name
+  co_applicant_name text,
+  father_spouse_name text,
+  permanent_address text,
+  correspondence_address text,
+  customer_phone text,                       -- Mobile No
+  customer_email text,                       -- Email ID
+
+  -- Section 2: Property Preference & Selection
+  parking_requirement text check (parking_requirement in ('covered','none')) default 'none',
+  parking_count int,
+
+  -- Section 3: Financials & Payment Details
+  agreement_value numeric not null,          -- used as Basic Sale Price (BSP)
+  stamp_duty_rate numeric not null default 7 check (stamp_duty_rate in (6,7)),
   stamp_duty numeric not null,
   registration numeric not null,
   gst numeric not null,
   package numeric not null,
+  booking_amount_paid numeric,
+  payment_mode text check (payment_mode in ('Cheque','DD','NEFT','RTGS')),
+  payment_ref_no text,
+  payment_plan text check (payment_plan in ('down_payment','construction_linked','flexi')),
+
+  -- Admin-only internal tracking. Deliberately NOT part of agreement_value/
+  -- stamp_duty/gst/package math and NOT printed on the official booking form —
+  -- see schema notes: this must never reduce the registered consideration.
+  furniture_cost numeric default 0,
+
   booking_date date not null default current_date,
   created_by uuid references public.profiles(id),
   status text not null default 'active' check (status in ('active','cancelled')),
@@ -325,7 +360,13 @@ grant execute on function public.admin_update_unit_price(text, numeric, numeric,
 create or replace function public.create_booking(
   p_unit_id text, p_customer_name text, p_customer_phone text, p_customer_email text,
   p_agreement_value numeric, p_stamp_duty numeric, p_registration numeric,
-  p_gst numeric, p_package numeric, p_apr_override numeric default null
+  p_gst numeric, p_package numeric, p_apr_override numeric default null,
+  p_co_applicant_name text default null, p_father_spouse_name text default null,
+  p_permanent_address text default null, p_correspondence_address text default null,
+  p_parking_requirement text default 'none', p_parking_count int default null,
+  p_booking_amount_paid numeric default null, p_payment_mode text default null,
+  p_payment_ref_no text default null, p_payment_plan text default null,
+  p_stamp_duty_rate numeric default 7, p_furniture_cost numeric default 0
 )
 returns uuid
 language plpgsql
@@ -335,6 +376,7 @@ as $$
 declare
   v_booking_id uuid;
   v_status text;
+  v_furniture_cost numeric;
 begin
   if not exists (select 1 from public.profiles where id = auth.uid()) then
     raise exception 'Not authorized';
@@ -348,12 +390,22 @@ begin
     raise exception 'Unit is blocked by admin';
   end if;
 
+  -- furniture_cost is admin-only; silently zero it out for non-admins
+  -- rather than trusting the client to have hidden the field.
+  v_furniture_cost := case when public.is_admin() then coalesce(p_furniture_cost, 0) else 0 end;
+
   insert into public.bookings (
     unit_id, customer_name, customer_phone, customer_email,
-    agreement_value, stamp_duty, registration, gst, package, created_by
+    agreement_value, stamp_duty_rate, stamp_duty, registration, gst, package, created_by,
+    co_applicant_name, father_spouse_name, permanent_address, correspondence_address,
+    parking_requirement, parking_count, booking_amount_paid, payment_mode, payment_ref_no, payment_plan,
+    furniture_cost
   ) values (
     p_unit_id, p_customer_name, p_customer_phone, p_customer_email,
-    p_agreement_value, p_stamp_duty, p_registration, p_gst, p_package, auth.uid()
+    p_agreement_value, coalesce(p_stamp_duty_rate, 7), p_stamp_duty, p_registration, p_gst, p_package, auth.uid(),
+    p_co_applicant_name, p_father_spouse_name, p_permanent_address, p_correspondence_address,
+    coalesce(p_parking_requirement, 'none'), p_parking_count, p_booking_amount_paid, p_payment_mode, p_payment_ref_no, p_payment_plan,
+    v_furniture_cost
   ) returning id into v_booking_id;
 
   update public.units set status = 'sold', updated_at = now() where id = p_unit_id;
@@ -369,7 +421,10 @@ begin
 end;
 $$;
 
-grant execute on function public.create_booking(text, text, text, text, numeric, numeric, numeric, numeric, numeric, numeric) to authenticated;
+grant execute on function public.create_booking(
+  text, text, text, text, numeric, numeric, numeric, numeric, numeric, numeric,
+  text, text, text, text, text, int, numeric, text, text, text, numeric, numeric
+) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 11) EDIT a booking — Admin or Site Head only. Fully audited.
@@ -377,7 +432,13 @@ grant execute on function public.create_booking(text, text, text, text, numeric,
 create or replace function public.edit_booking(
   p_booking_id uuid, p_customer_name text, p_customer_phone text, p_customer_email text,
   p_agreement_value numeric, p_stamp_duty numeric, p_registration numeric,
-  p_gst numeric, p_package numeric
+  p_gst numeric, p_package numeric,
+  p_co_applicant_name text default null, p_father_spouse_name text default null,
+  p_permanent_address text default null, p_correspondence_address text default null,
+  p_parking_requirement text default 'none', p_parking_count int default null,
+  p_booking_amount_paid numeric default null, p_payment_mode text default null,
+  p_payment_ref_no text default null, p_payment_plan text default null,
+  p_stamp_duty_rate numeric default 7, p_furniture_cost numeric default null
 )
 returns void
 language plpgsql
@@ -386,6 +447,7 @@ set search_path = public
 as $$
 declare
   v_old record;
+  v_furniture_cost numeric;
 begin
   if not public.is_admin_or_site_head() then
     raise exception 'Only Admin or Site Head can edit a booking';
@@ -396,15 +458,35 @@ begin
     raise exception 'Booking not found';
   end if;
 
+  -- furniture_cost is admin-only; a Site Head's edit leaves it untouched,
+  -- and even an admin's null input leaves the existing value as-is.
+  v_furniture_cost := case
+    when not public.is_admin() then v_old.furniture_cost
+    when p_furniture_cost is null then v_old.furniture_cost
+    else p_furniture_cost
+  end;
+
   update public.bookings set
     customer_name = p_customer_name,
     customer_phone = p_customer_phone,
     customer_email = p_customer_email,
     agreement_value = p_agreement_value,
+    stamp_duty_rate = coalesce(p_stamp_duty_rate, v_old.stamp_duty_rate, 7),
     stamp_duty = p_stamp_duty,
     registration = p_registration,
     gst = p_gst,
     package = p_package,
+    co_applicant_name = p_co_applicant_name,
+    father_spouse_name = p_father_spouse_name,
+    permanent_address = p_permanent_address,
+    correspondence_address = p_correspondence_address,
+    parking_requirement = coalesce(p_parking_requirement, 'none'),
+    parking_count = p_parking_count,
+    booking_amount_paid = p_booking_amount_paid,
+    payment_mode = p_payment_mode,
+    payment_ref_no = p_payment_ref_no,
+    payment_plan = p_payment_plan,
+    furniture_cost = v_furniture_cost,
     updated_at = now()
   where id = p_booking_id;
 
@@ -414,14 +496,23 @@ begin
     to_jsonb(v_old),
     jsonb_build_object(
       'customer_name', p_customer_name, 'customer_phone', p_customer_phone, 'customer_email', p_customer_email,
-      'agreement_value', p_agreement_value, 'stamp_duty', p_stamp_duty, 'registration', p_registration,
-      'gst', p_gst, 'package', p_package
+      'agreement_value', p_agreement_value, 'stamp_duty_rate', p_stamp_duty_rate, 'stamp_duty', p_stamp_duty,
+      'registration', p_registration, 'gst', p_gst, 'package', p_package,
+      'co_applicant_name', p_co_applicant_name, 'father_spouse_name', p_father_spouse_name,
+      'permanent_address', p_permanent_address, 'correspondence_address', p_correspondence_address,
+      'parking_requirement', p_parking_requirement, 'parking_count', p_parking_count,
+      'booking_amount_paid', p_booking_amount_paid, 'payment_mode', p_payment_mode,
+      'payment_ref_no', p_payment_ref_no, 'payment_plan', p_payment_plan,
+      'furniture_cost', v_furniture_cost
     )
   );
 end;
 $$;
 
-grant execute on function public.edit_booking(uuid, text, text, text, numeric, numeric, numeric, numeric, numeric) to authenticated;
+grant execute on function public.edit_booking(
+  uuid, text, text, text, numeric, numeric, numeric, numeric, numeric,
+  text, text, text, text, text, int, numeric, text, text, text, numeric, numeric
+) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 12) ADMIN: cancel a booking (frees the unit)

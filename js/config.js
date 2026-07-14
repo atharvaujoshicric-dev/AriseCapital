@@ -1,19 +1,23 @@
 // =====================================================================
-// TRUSTON (Arise Capital) — Project Configuration
+// ARISE CAPITAL — TRUSTON — Project Configuration
 // Fill in your Supabase credentials below (Settings → API in Supabase).
 // =====================================================================
 
-const SUPABASE_URL = "https://ztqitrdjbieaigkjnrko.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0cWl0cmRqYmllYWlna2pucmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5NDAyMDEsImV4cCI6MjA5OTUxNjIwMX0.yRbcBJmBiNk-DQUn0nXnBI4SdxmG2ssEAj7YaHtgXUI";
+const SUPABASE_URL = "YOUR_SUPABASE_URL_HERE";
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
 
-const PROJECT_NAME = "TRUSTON";
-const PROJECT_SUBTITLE = "Arise Capital";
+const PROJECT_NAME = "ARISE CAPITAL";            // top-of-form company brand/logo
+const PROJECT_TRUSTON_NAME = "TRUSTON";          // project name shown in the footer lockup
+const PROJECT_TAGLINE = "Beyond Perfection";     // Truston's tagline in the footer
 const PROJECT_ADDRESS = "Sr. No. 130, Wakad, Pune";
 const PROJECT_RERA_NUMBER = "PC1260002600906";
+const RERA_WEBSITE = "www.maharera.maharashtra.gov.in";
 const PROJECT_LOGO_PATH = "assets/logo.png"; // put your logo file here (optional)
 
-// Bank account details for payment (from the cost sheet) — shown in T&Cs / footer.
-const PROJECT_PAYEE_NAME = "Vonode Wakadkar Buildcon LLP";
+// Sales Office / bank details — shown in the footer and Terms & Conditions.
+const SALES_OFFICE_NAME = "Vinode Wakadkar Buildcon LLP";
+const SALES_OFFICE_ADDRESS = "Shop No. 1, Ground Floor, Swapna Shilpa, Wakad Road, Wakad, Pune, Maharashtra - 411057";
+const PROJECT_PAYEE_NAME = "Vinode Wakadkar Buildcon LLP";
 const PROJECT_BANK_NAME = "NKGSB Bank, Wakad Branch";
 const PROJECT_BANK_ACCOUNT = "071111190212000";
 const PROJECT_BANK_IFSC = "NKGS0000071";
@@ -38,20 +42,23 @@ const PAYMENT_SCHEDULE = [
 // edit freely, the app does not enforce that they sum to 100.
 
 // ---------------------------------------------------------------------
-// STANDARD TERMS & CONDITIONS — printed on page 2 of every cost sheet.
-// Derived from the cost sheet you shared; edit as needed.
+// STANDARD TERMS & CONDITIONS — verbatim from the official Booking /
+// Allotment Application form artwork. Printed on the last page of
+// every booking form PDF.
 // ---------------------------------------------------------------------
 const STANDARD_TERMS = [
   "Prices mentioned herein are indicative and subject to change without prior notice at the sole discretion of the developer.",
   "Booking shall be confirmed only upon realization of the booking amount and issuance of a booking confirmation by the developer.",
   "Registration shall be completed within 7 days from the date of booking/allotment.",
-  "GST, Stamp Duty, Registration Charges, Maintenance Deposit, Monthly Maintenance Charges @ ₹8/- per sq. ft., One-time Corpus Fund @ ₹150/- per sq. ft. + applicable GST, Legal/Advocate Fees of ₹10,000/- and all applicable statutory charges shall be borne by the purchaser.",
+  "GST, Stamp Duty, Registration Charges, Maintenance Deposit, Corpus Fund and all applicable statutory charges shall be borne by the purchaser. Legal/Advocate Fees of ₹10,000 shall be payable before execution of the Agreement for Sale.",
+  "Government taxes, duties, premiums, cess and statutory levies are subject to change and shall be applicable at actuals.",
   "The unit forms part of a commercially sanctioned development and applicable taxes shall be levied accordingly.",
   "Payments shall be made as per the agreed payment schedule. Delayed payments shall attract interest as applicable under the Agreement for Sale and prevailing regulations.",
-  "All Cheques/DD shall be drawn in favour of Vonode Wakadkar Buildcon LLP. RTGS/NEFT payments shall be made only to the designated account maintained with NKGSB Bank, Wakad Branch. Account No.: 071111190212000 | IFSC Code: NKGS0000071.",
+  "All Cheques/DD shall be drawn in favour of Vinode Wakadkar Buildcon LLP. RTGS/NEFT payments shall be made only to the designated account maintained with NKGSB Bank, Wakad Branch. Account No.: 071111190212000 | IFSC Code: NKGS0000071.",
   "Carpet area, specifications, layouts, amenities and plans are subject to permissible variations and approvals from competent authorities.",
   "Any references to rental potential, leasing opportunities, demand generation, commercial growth, future appreciation or investment returns are indicative in nature and shall not be construed as a guarantee by the developer.",
   "Any proposed association with third-party rental management, co-living, hospitality or leasing operators shall be subject to separate agreements and approvals.",
+  "This cost sheet is indicative, confidential and valid for a limited period only.",
   "In case of any discrepancy, the terms and conditions contained in the registered Agreement for Sale shall prevail over this cost sheet and all marketing communications.",
 ];
 
@@ -61,4 +68,13 @@ const CATEGORY_META = {
   Office:   { label: "Office Spaces",     color: "#2f5f6b" },
   Showroom: { label: "Showrooms",         color: "#7a3b8a" },
   Shop:     { label: "Shops",             color: "#3b7a4e" },
+};
+
+// PDF theme — matches the official Booking / Allotment Application form
+const PDF_THEME = {
+  brown: [156, 118, 79],     // banner fills ("OFFICIAL APPLICATION...", "Terms & Condition")
+  brownLight: [246, 240, 231],
+  dark: [30, 27, 24],        // logo text / headings
+  gold: [201, 150, 47],      // accent underline
+  gray: [110, 110, 110],
 };

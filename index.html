@@ -53,7 +53,7 @@
 <div id="appShell" class="app-shell" style="display:none;">
   <header class="topbar">
     <div class="topbar-brand">
-      <div class="topbar-title">TRUSTON <span>Arise Capital</span></div>
+      <div class="topbar-title">ARISE CAPITAL <span>TRUSTON</span></div>
       <div class="topbar-sub">Sr. No. 130, Wakad, Pune · RERA: <span id="reraNoTop"></span></div>
     </div>
     <div class="topbar-actions">
@@ -107,30 +107,94 @@
 
 <!-- ================= BOOKING MODAL ================= -->
 <div id="bookingModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
+  <div class="modal-box" style="width:520px;">
     <div class="modal-header">
-      <h3>Create Booking / Cost Sheet</h3>
+      <h3>Create Booking / Application Form</h3>
       <button class="modal-close" id="closeBookingModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="bookingUnitSummary" class="booking-unit-summary"></div>
-      <label>Customer Name <span class="required">*</span></label>
+
+      <div class="form-section-label">1. Applicant Details</div>
+      <label>Sole / First Applicant Name <span class="required">*</span></label>
       <input type="text" id="custName" placeholder="Full name as per PAN/Aadhaar" />
-      <label>Phone</label>
+      <label>Co-Applicant Name (if any)</label>
+      <input type="text" id="custCoApplicant" placeholder="Optional" />
+      <label>Father's / Spouse's Name</label>
+      <input type="text" id="custFatherSpouse" placeholder="Optional" />
+      <label>Permanent Address</label>
+      <input type="text" id="custPermAddress" placeholder="Optional" />
+      <label>Correspondence Address</label>
+      <input type="text" id="custCorrAddress" placeholder="Optional" />
+      <label>Mobile No</label>
       <input type="text" id="custPhone" placeholder="Contact number" />
-      <label>Email</label>
+      <label>Email ID</label>
       <input type="email" id="custEmail" placeholder="Email address" />
-      <div id="adminPriceOverride" style="display:none;">
-        <hr/>
-        <label>Override Agreement Value (Admin only, optional)</label>
-        <input type="number" id="overrideAgreement" placeholder="Leave blank to use standard price" />
+      <label>Sourcing Executive / Agent Name</label>
+      <input type="text" id="custSourcingExec" placeholder="Defaults to your name" />
+
+      <div class="form-section-label">2. Property Preference & Parking</div>
+      <div class="detail-row"><span>Property Segment</span><b id="bookingCategoryDisplay"></b></div>
+      <label>Car Parking Requirement</label>
+      <select id="parkingRequirement">
+        <option value="none">None</option>
+        <option value="covered">Covered</option>
+      </select>
+      <label>No. of Parking Spaces (if Covered)</label>
+      <input type="number" id="parkingCount" placeholder="e.g. 1" min="0" />
+
+      <div class="form-section-label">3. Financials & Payment Details</div>
+      <label>Basic Sale Price / Agreement Value (Rs)</label>
+      <input type="number" id="bkAgreementValue" />
+      <label>Stamp Duty Rate</label>
+      <select id="bkStampDutyRate">
+        <option value="7">7%</option>
+        <option value="6">6% (concessional)</option>
+      </select>
+      <label>Stamp Duty (Rs) <span class="field-note">— auto-calculated, editable</span></label>
+      <input type="number" id="bkStampDuty" />
+      <label>Registration (Rs)</label>
+      <input type="number" id="bkRegistration" />
+      <label>GST (Rs) <span class="field-note">— auto-calculated @ 12%, editable</span></label>
+      <input type="number" id="bkGst" />
+      <label>Total Package (Rs) <span class="field-note">— auto-calculated, editable</span></label>
+      <input type="number" id="bkPackage" />
+
+      <label>Booking Amount Paid (Rs)</label>
+      <input type="number" id="bookingAmountPaid" placeholder="e.g. 500000" />
+      <label>Payment Mode</label>
+      <select id="paymentMode">
+        <option value="">— Select —</option>
+        <option value="Cheque">Cheque</option>
+        <option value="DD">DD</option>
+        <option value="NEFT">NEFT</option>
+        <option value="RTGS">RTGS</option>
+      </select>
+      <label>Payment Reference No.</label>
+      <input type="text" id="paymentRefNo" placeholder="Cheque/DD/NEFT/RTGS ref no." />
+      <label>Preferred Payment Plan</label>
+      <select id="paymentPlan">
+        <option value="">— Select —</option>
+        <option value="down_payment">Down Payment Plan</option>
+        <option value="construction_linked">Construction Linked Plan</option>
+        <option value="flexi">Flexi Plan</option>
+      </select>
+
+      <div id="adminFurnitureCost" style="display:none;">
+        <div class="form-section-label">Admin Only — Internal Tracking</div>
+        <label>Furniture / Fixture Cost (Rs)</label>
+        <input type="number" id="bkFurnitureCost" placeholder="0" />
+        <div class="field-note" style="margin-top:2px;">
+          Tracked internally for your records only. This does <b>not</b> reduce the Agreement Value, Stamp Duty, GST, or Total Package above, and is never printed on the booking form — those figures must reflect the actual registered consideration.
+        </div>
       </div>
+
       <div id="bookingError" class="error-msg" style="display:none;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="cancelBookingBtn">Cancel</button>
-      <button class="btn btn-outline" id="previewPdfBtn">Preview Cost Sheet (no booking)</button>
-      <button class="btn btn-primary" id="confirmBookingBtn">Confirm Booking & Download PDF</button>
+      <button class="btn btn-outline" id="previewPdfBtn">Preview Form (no booking)</button>
+      <button class="btn btn-primary" id="confirmBookingBtn">Confirm Booking & Download Form</button>
     </div>
   </div>
 </div>
@@ -213,29 +277,82 @@
 
 <!-- ================= EDIT BOOKING MODAL (Admin + Site Head) ================= -->
 <div id="editBookingModal" class="modal-overlay" style="display:none;">
-  <div class="modal-box">
+  <div class="modal-box" style="width:500px;">
     <div class="modal-header">
       <h3>Edit Booking</h3>
       <button class="modal-close" id="closeEditBookingModal">&times;</button>
     </div>
     <div class="modal-body">
       <div id="editBookingError" class="error-msg" style="display:none;"></div>
-      <label>Customer Name</label>
+      <div class="form-section-label">Applicant Details</div>
+      <label>Sole / First Applicant Name</label>
       <input type="text" id="editCustName" />
-      <label>Phone</label>
+      <label>Co-Applicant Name</label>
+      <input type="text" id="editCoApplicant" />
+      <label>Father's / Spouse's Name</label>
+      <input type="text" id="editFatherSpouse" />
+      <label>Permanent Address</label>
+      <input type="text" id="editPermAddress" />
+      <label>Correspondence Address</label>
+      <input type="text" id="editCorrAddress" />
+      <label>Mobile No</label>
       <input type="text" id="editCustPhone" />
-      <label>Email</label>
+      <label>Email ID</label>
       <input type="email" id="editCustEmail" />
-      <label>Agreement Value</label>
+
+      <div class="form-section-label">Parking</div>
+      <label>Car Parking Requirement</label>
+      <select id="editParkingRequirement">
+        <option value="none">None</option>
+        <option value="covered">Covered</option>
+      </select>
+      <label>No. of Parking Spaces</label>
+      <input type="number" id="editParkingCount" min="0" />
+
+      <div class="form-section-label">Financials & Payment</div>
+      <label>Basic Sale Price / Agreement Value</label>
       <input type="number" id="editAgreement" />
-      <label>Stamp Duty</label>
+      <label>Stamp Duty Rate</label>
+      <select id="editStampDutyRate">
+        <option value="7">7%</option>
+        <option value="6">6% (concessional)</option>
+      </select>
+      <label>Stamp Duty <span class="field-note">— auto-calculated, editable</span></label>
       <input type="number" id="editStampDuty" />
       <label>Registration</label>
       <input type="number" id="editRegistration" />
-      <label>GST</label>
+      <label>GST <span class="field-note">— auto-calculated @ 12%, editable</span></label>
       <input type="number" id="editGst" />
-      <label>Total Package</label>
+      <label>Total Package <span class="field-note">— auto-calculated, editable</span></label>
       <input type="number" id="editPackage" />
+      <label>Booking Amount Paid</label>
+      <input type="number" id="editBookingAmountPaid" />
+      <label>Payment Mode</label>
+      <select id="editPaymentMode">
+        <option value="">— Select —</option>
+        <option value="Cheque">Cheque</option>
+        <option value="DD">DD</option>
+        <option value="NEFT">NEFT</option>
+        <option value="RTGS">RTGS</option>
+      </select>
+      <label>Payment Reference No.</label>
+      <input type="text" id="editPaymentRefNo" />
+      <label>Preferred Payment Plan</label>
+      <select id="editPaymentPlan">
+        <option value="">— Select —</option>
+        <option value="down_payment">Down Payment Plan</option>
+        <option value="construction_linked">Construction Linked Plan</option>
+        <option value="flexi">Flexi Plan</option>
+      </select>
+
+      <div id="editAdminFurnitureCost" style="display:none;">
+        <div class="form-section-label">Admin Only — Internal Tracking</div>
+        <label>Furniture / Fixture Cost (Rs)</label>
+        <input type="number" id="editFurnitureCost" placeholder="0" />
+        <div class="field-note" style="margin-top:2px;">
+          Internal record only — not part of Agreement Value/Stamp Duty/GST/Package, and never printed on the booking form.
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" id="cancelEditBookingBtn">Cancel</button>
@@ -279,6 +396,7 @@
 <!-- Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script src="js/config.js"></script>

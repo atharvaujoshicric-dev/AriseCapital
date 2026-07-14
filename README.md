@@ -1,16 +1,17 @@
-# TRUSTON (Arise Capital) — Inventory & Cost Sheet System
+# ARISE CAPITAL — TRUSTON — Inventory & Booking Form System
 
-Real estate inventory management + cost-sheet generation system for the TRUSTON
-commercial project at Sr. No. 130, Wakad, Pune. Built the same way as your
-Sahjeevan system: Supabase backend (Postgres + Auth + RLS), fully static
-frontend, deployable directly on GitHub Pages.
+Real estate inventory management + official Booking/Allotment Application form
+generator for the TRUSTON commercial project (developer: Arise Capital) at
+Sr. No. 130, Wakad, Pune. Built the same way as your Sahjeevan system:
+Supabase backend (Postgres + Auth + RLS), fully static frontend, deployable
+directly on GitHub Pages.
 
 ## What's inside
 
 - **447 units** pre-loaded: 388 Studio/Hostel rooms, 54 Offices, 2 Showrooms, 3 Shops
 - **Three roles**: **Admin** (full control), **Site Head** (can edit any booking, same as admin), **Sales** (day-to-day booking)
 - **Live inventory grid**: Available / On Hold / Sold / Blocked, filterable by category, floor, status
-- **Booking flow**: capture customer details → auto-generates a 2-page cost sheet PDF (Agreement Value, Stamp Duty, Registration, GST, Total Package, amount in words, Payment Schedule, Terms & Conditions)
+- **Booking flow**: capture full applicant, property, and payment details → auto-generates a 3-page PDF that replicates your official "Official Application for Booking / Allotment" form exactly (Applicant Details, Property Preference & Parking, Financials & Payment Details, Declaration & Signatures, For Office Use, Payment Schedule, Terms & Conditions)
 - **Bookings panel**: Admin + Site Head can view every booking and **edit** it (customer details, pricing); Admin can also cancel a booking (releases the unit back to Available)
 - **Audit Log** (Admin only): every booking edit, cancellation, unit status/price override, user-role change, and system reset is logged with **who did it and exactly what changed** (before/after values)
 - **Reset System** (Admin only): one button, behind a typed "RESET" confirmation, that sets every unit back to Available and cancels every active booking — fully logged in the Audit Log
@@ -19,7 +20,8 @@ frontend, deployable directly on GitHub Pages.
 
 ## ⚠️ Assumptions you should double-check
 
-1. **Payment Schedule** in `js/config.js` (`PAYMENT_SCHEDULE`) is a **placeholder** — you said to use one for now. Replace stage names/percentages with the real Stage-of-Payment slabs whenever you have them; it's printed on every cost sheet.
+1. **Payment Schedule** in `js/config.js` (`PAYMENT_SCHEDULE`) is a **placeholder** — you said to use one for now. Replace stage names/percentages with the real Stage-of-Payment slabs whenever you have them; it's printed on page 3 of every booking form, in the space above the Terms & Conditions.
+2. **Logo** — no source logo file was provided, so the ARISE CAPITAL mark on the PDF is a vector approximation (triangle + wordmark), not the real artwork. Swap in the real logo any time by adding `assets/logo.png` and updating `drawAriseLogo()` in `js/app.js` to use `doc.addImage(...)` instead.
 2. **Shop 3 & Shop 4** — the source documents only gave a *combined* carpet area (491.16 sq.ft) and one price point for both. Since you confirmed they're separate units and the floor plan shows identical dimensions for both, I split the area/price evenly between `SHOP-01` (Shop 3) and `SHOP-02` (Shop 4), each getting a full ₹30,000 registration fee. If the actual individual pricing differs, edit those two rows directly in Supabase (`units` table) or re-run part of the seed script.
 3. Unit ID format: `STU-FFRR` (Studio, floor+room), `OFC-FRR` (Office, floor+unit), `SHOW-01/02` (Showroom), `SHOP-01/02/03` (Shop) — matching the convention you gave for offices.
 
@@ -72,7 +74,8 @@ const SUPABASE_ANON_KEY = "your-anon-public-key";
 |---|---|---|---|
 | View inventory grid | ✅ | ✅ | ✅ |
 | Place / release a Hold | ✅ | ✅ | ✅ |
-| Create a booking (generates cost sheet PDF) | ✅ | ✅ | ✅ |
+| Create a booking (generates the official Booking Form PDF) | ✅ | ✅ | ✅ |
+| Reprint an existing booking's PDF | ❌ | ✅ | ✅ |
 | View Bookings panel | ❌ | ✅ | ✅ |
 | **Edit a booking** (customer details, pricing) | ❌ | ✅ | ✅ |
 | Cancel a booking | ❌ | ❌ | ✅ |
@@ -115,5 +118,6 @@ Work through these in order — in practice it's almost always #1 or #2:
 
 ## Notes
 - Prices are exactly as given in your cost sheet (per unit type/carpet size), applied consistently regardless of floor — as you confirmed for offices, and same logic applied to studios/showrooms/shops.
+- The generated PDF is a close visual match to your official Booking/Allotment Application artwork (brown accent banners, bordered sections, checkboxes, signature lines, FOR OFFICE USE ONLY block) with a QR code linking to the MahaRERA site and the Payment Schedule table filling the space above Terms & Conditions on the last page.
 - All monetary values are stored as plain numbers (INR) in Supabase — no currency conversion.
 - No logo file is bundled; drop one at `assets/logo.png` if you want it on the PDF later (currently the PDF uses a text header only, no logo).
