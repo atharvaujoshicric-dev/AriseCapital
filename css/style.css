@@ -135,6 +135,10 @@ select {
 .detail-content h3 { margin: 0 0 4px; color: var(--teal-dark); }
 .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
 .detail-row b { color: var(--text); }
+.detail-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 13px; gap: 8px; }
+.detail-edit-row span { white-space: nowrap; color: #555; }
+.detail-edit-row input, .detail-edit-row select { width: 130px; padding: 4px 6px; border: 1.5px solid var(--border); border-radius: 4px; font-size: 12px; text-align: right; }
+.detail-edit-row select { text-align: left; width: 140px; }
 .detail-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .admin-section { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--border); }
 .admin-section .sidebar-label { margin-bottom: 8px; }

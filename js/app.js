@@ -240,6 +240,8 @@ function renderDetail() {
   const box = document.getElementById("detailContent");
   box.style.display = "block";
 
+  const isAdmin = currentProfile.role === "admin";
+
   let html = `
     <div class="detail-content">
       <h3>${u.unit_label}</h3>
@@ -247,11 +249,34 @@ function renderDetail() {
       <div class="detail-row"><span>Status</span><b><span class="status-dot dot-${u.status}"></span>${u.status.replace("_"," ")}</b></div>
       <div class="detail-row"><span>Carpet Area</span><b>${u.carpet} sq.ft</b></div>
       <div class="detail-row"><span>Saleable Area</span><b>${u.saleable} sq.ft</b></div>
+  `;
+
+  if (isAdmin) {
+    html += `
+      <div class="detail-edit-row"><span>Agreement Value</span><input type="number" id="detAgreementValue" value="${u.agreement_value}"></div>
+      <div class="detail-edit-row"><span>Stamp Duty Rate</span>
+        <select id="detStampDutyRate">
+          <option value="7">7%</option>
+          <option value="6">6% (concessional)</option>
+        </select>
+      </div>
+      <div class="detail-edit-row"><span>Stamp Duty</span><input type="number" id="detStampDuty" value="${u.stamp_duty}"></div>
+      <div class="detail-edit-row"><span>Registration</span><input type="number" id="detRegistration" value="${u.registration}"></div>
+      <div class="detail-edit-row"><span>GST</span><input type="number" id="detGst" value="${u.gst}"></div>
+      <div class="detail-edit-row"><span>Total Package</span><input type="number" id="detPackage" value="${u.package}"></div>
+      <button class="btn btn-outline btn-sm btn-block" style="margin-top:8px;" onclick="saveUnitPrice()">💾 Save Price Changes</button>
+    `;
+  } else {
+    html += `
       <div class="detail-row"><span>Agreement Value</span><b>₹${fmtNum(u.agreement_value)}</b></div>
       <div class="detail-row"><span>Stamp Duty</span><b>₹${fmtNum(u.stamp_duty)}</b></div>
       <div class="detail-row"><span>Registration</span><b>₹${fmtNum(u.registration)}</b></div>
       <div class="detail-row"><span>GST</span><b>₹${fmtNum(u.gst)}</b></div>
       <div class="detail-row"><span>Total Package</span><b>₹${fmtNum(u.package)}</b></div>
+    `;
+  }
+
+  html += `
       ${u.note ? `<div style="font-size:11px;color:#a97b1f;margin-top:8px;">⚠ ${u.note}</div>` : ""}
     </div>
     <div class="detail-actions">
@@ -270,7 +295,7 @@ function renderDetail() {
   html += `<button class="btn btn-ghost" onclick="openBookingModal(true)">Preview Booking Form (no booking)</button>`;
   html += `</div>`;
 
-  if (currentProfile.role === "admin") {
+  if (isAdmin) {
     html += `
       <div class="admin-section">
         <div class="sidebar-label">Admin Controls</div>
@@ -286,6 +311,29 @@ function renderDetail() {
   }
 
   box.innerHTML = html;
+
+  if (isAdmin) {
+    wireFinancialsRecalc({
+      agreement: "detAgreementValue", rate: "detStampDutyRate", stamp: "detStampDuty",
+      registration: "detRegistration", gst: "detGst", package: "detPackage"
+    });
+  }
+}
+
+async function saveUnitPrice() {
+  const agreement = Number(document.getElementById("detAgreementValue").value || 0);
+  const stamp = Number(document.getElementById("detStampDuty").value || 0);
+  const reg = Number(document.getElementById("detRegistration").value || 0);
+  const gst = Number(document.getElementById("detGst").value || 0);
+  const pkg = Number(document.getElementById("detPackage").value || 0);
+
+  const { error } = await sb.rpc("admin_update_unit_price", {
+    p_unit_id: selectedUnit.id, p_agreement_value: agreement, p_stamp_duty: stamp,
+    p_registration: reg, p_gst: gst, p_package: pkg
+  });
+
+  if (error) { alert("Error: " + error.message); return; }
+  await refreshAfterAction();
 }
 
 async function toggleHold(hold) {
@@ -440,9 +488,29 @@ function currentBookingCosts() {
   };
 }
 
+// ---------------------------------------------------------------------
+// ON-SCREEN FORM PREVIEW (replaces auto-download — user prints manually)
+// ---------------------------------------------------------------------
+function showFormPreview(html, title) {
+  document.getElementById("formPreviewTitle").textContent = title || "Booking Form Preview";
+  document.getElementById("formPreviewFrame").srcdoc = html;
+  document.getElementById("formPreviewModal").style.display = "flex";
+}
+
+document.getElementById("closeFormPreviewModal").onclick = () => {
+  document.getElementById("formPreviewModal").style.display = "none";
+};
+
+document.getElementById("printFormBtn").onclick = () => {
+  const frame = document.getElementById("formPreviewFrame");
+  frame.contentWindow.focus();
+  frame.contentWindow.print();
+};
+
 document.getElementById("previewPdfBtn").onclick = () => {
   const name = document.getElementById("custName").value.trim() || "Prospective Customer";
-  generateBookingFormPDF(selectedUnit, name, currentBookingCosts(), collectFormExtras(), null);
+  const html = buildBookingFormHTML(selectedUnit, name, currentBookingCosts(), collectFormExtras(), null);
+  showFormPreview(html, "Preview — Not Yet Booked");
 };
 
 document.getElementById("confirmBookingBtn").onclick = async () => {
@@ -488,7 +556,8 @@ document.getElementById("confirmBookingBtn").onclick = async () => {
   }
 
   document.getElementById("bookingModal").style.display = "none";
-  generateBookingFormPDF(u, name, costs, collectFormExtras(), data);
+  const html = buildBookingFormHTML(u, name, costs, collectFormExtras(), data);
+  showFormPreview(html, "Booking Confirmed — " + name);
   await refreshAfterAction();
 };
 
@@ -634,7 +703,7 @@ async function renderBookingsList() {
         </div>
       </div>
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-outline btn-sm" onclick="reprintBooking('${b.id}')">⬇ PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="reprintBooking('${b.id}')">📄 View Form</button>
         <button class="btn btn-outline btn-sm" onclick="openEditBookingModal('${b.id}')">Edit</button>
         ${(currentProfile.role === "admin" && b.status === "active") ? `<button class="btn btn-ghost btn-sm" style="color:#b23b3b;" onclick="cancelBookingFromList('${b.id}')">Cancel</button>` : ""}
       </div>
@@ -666,12 +735,15 @@ async function reprintBooking(bookingId) {
     paymentPlan: b.payment_plan || "",
   };
 
-  generateBookingFormPDF(
-    b.units,
-    b.customer_name,
-    { agreement_value: b.agreement_value, stamp_duty: b.stamp_duty, registration: b.registration, gst: b.gst, package: b.package },
-    extras,
-    b.id
+  showFormPreview(
+    buildBookingFormHTML(
+      b.units,
+      b.customer_name,
+      { agreement_value: b.agreement_value, stamp_duty: b.stamp_duty, registration: b.registration, gst: b.gst, package: b.package },
+      extras,
+      b.id
+    ),
+    "Booking Form — " + b.customer_name
   );
 }
 window.reprintBooking = reprintBooking;
@@ -870,374 +942,6 @@ function numberToWordsIndian(num) {
   return parts.join(" ");
 }
 
-// ---------------------------------------------------------------------
-// LOGO + QR HELPERS
-// ---------------------------------------------------------------------
-function drawAriseLogo(doc, x, y, scale) {
-  // Vector approximation of the ARISE CAPITAL triangle mark (no source
-  // logo file was provided — colors sampled from the actual PDF artwork:
-  // gold gradient triangle ~(130-195,100-178,50-100), dark wordmark ~(21,19,18).
-  // Swap for doc.addImage(...) with the real logo asset for pixel-perfect match.
-  scale = scale || 1;
-  // Two-band fake gradient: lighter gold top-left, darker gold toward the base.
-  doc.setFillColor(195, 178, 101);
-  doc.triangle(x + 9*scale, y, x + 1*scale, y + 16*scale, x + 17*scale, y + 16*scale, "F");
-  doc.setFillColor(133, 104, 54);
-  doc.triangle(x + 9*scale, y + 7*scale, x + 4*scale, y + 16*scale, x + 14*scale, y + 16*scale, "F");
-  doc.setFillColor(21, 19, 18);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15 * scale);
-  doc.text("A R I S E", x - 2*scale, y + 23*scale);
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.3);
-  doc.line(x - 2*scale, y + 25*scale, x + 34*scale, y + 25*scale);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7 * scale);
-  doc.setTextColor(140, 113, 63);
-  doc.text("C A P I T A L", x + 1*scale, y + 29*scale);
-  doc.setTextColor(0,0,0);
-}
-
-function drawQRCode(doc, text, x, y, size) {
-  try {
-    const qr = window.qrcode(0, "M");
-    qr.addData(text);
-    qr.make();
-    const count = qr.getModuleCount();
-    const cell = size / count;
-    doc.setFillColor(0,0,0);
-    for (let row = 0; row < count; row++) {
-      for (let col = 0; col < count; col++) {
-        if (qr.isDark(row, col)) {
-          doc.rect(x + col * cell, y + row * cell, cell, cell, "F");
-        }
-      }
-    }
-  } catch (e) {
-    // Fallback if the QR library didn't load — draw a labeled placeholder box.
-    doc.setDrawColor(150,150,150);
-    doc.rect(x, y, size, size);
-    doc.setFontSize(6);
-    doc.text("QR", x + size/2 - 3, y + size/2 + 1);
-  }
-}
-
-// Exact brown/tan accent sampled from the source artwork (RGB 164,124,98).
-const FORM_BROWN = [164, 124, 98];
-
-function drawFormHeader(doc, pageW) {
-  drawAriseLogo(doc, 14, 6, 1.0);
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(80,80,80);
-  doc.text("MAHA-RERA Registration No.", pageW - 66, 13);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(0,0,0);
-  doc.text(PROJECT_RERA_NUMBER, pageW - 66, 18);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6);
-  doc.setTextColor(80,80,80);
-  doc.text(RERA_WEBSITE, pageW - 66, 22);
-  drawQRCode(doc, "https://maharera.maharashtra.gov.in/", pageW - 22, 8, 16);
-
-  // Full-bleed gold line, edge to edge (measured y ≈ 43mm on the source PDF)
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.6);
-  doc.line(0, 43, pageW, 43);
-
-  // "OFFICIAL APPLICATION..." banner: centered, ~118mm wide (measured)
-  const bannerW = 118, bannerH = 6.5;
-  const bannerX = (pageW - bannerW) / 2;
-  doc.setFillColor(...FORM_BROWN);
-  doc.rect(bannerX, 43.3, bannerW, bannerH, "F");
-  doc.setTextColor(255,255,255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.5);
-  doc.text("OFFICIAL APPLICATION FOR BOOKING / ALLOTMENT", pageW / 2, 43.3 + bannerH/2 + 1.2, { align: "center" });
-  doc.setTextColor(0,0,0);
-}
-
-function drawFormFooter(doc, pageW, pageH) {
-  // Full-bleed gold line above the footer (measured y ≈ 275.7mm)
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.5);
-  doc.line(0, pageH - 21.2, pageW, pageH - 21.2);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(80,80,80);
-  const lines = doc.splitTextToSize("Sales Office: " + SALES_OFFICE_NAME + ", " + SALES_OFFICE_ADDRESS, 130);
-  doc.text(lines, 14, pageH - 15);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(0,0,0);
-  doc.text(PROJECT_TRUSTON_NAME, pageW - 55, pageH - 16);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.5);
-  doc.text(PROJECT_TAGLINE, pageW - 55, pageH - 12.5);
-  doc.setTextColor(0,0,0);
-}
-
-function drawCheckbox(doc, x, y, checked) {
-  doc.setDrawColor(0,0,0);
-  doc.rect(x, y, 4, 4);
-  if (checked) {
-    doc.setFont("helvetica", "bold");
-    doc.text("X", x + 0.8, y + 3.2);
-  }
-}
-
-function labeledLine(doc, label, value, x, y, labelWidth, lineEndX) {
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.text(label, x, y);
-  const lineStartX = x + labelWidth;
-  doc.setDrawColor(120,120,120);
-  doc.setLineWidth(0.2);
-  doc.line(lineStartX, y + 0.8, lineEndX, y + 0.8);
-  if (value) {
-    doc.setFont("helvetica", "bold");
-    doc.text(String(value), lineStartX + 2, y);
-  }
-}
-
-// ---------------------------------------------------------------------
-// MAIN GENERATOR — exact recreation of the official Booking/Allotment
-// Application form, with the Payment Schedule inserted into the blank
-// space above the Terms & Conditions on the final page.
-// ---------------------------------------------------------------------
-function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const pageW = 210, pageH = 297;
-  extras = extras || {};
-  const today = new Date();
-  const dateStr = `${String(today.getDate()).padStart(2,"0")} / ${String(today.getMonth()+1).padStart(2,"0")} / ${today.getFullYear()}`;
-  const formNo = "TRC-" + (bookingId ? bookingId.slice(0, 8).toUpperCase() : "PREVIEW");
-
-  // ============ PAGE 1 ============
-  drawFormHeader(doc, pageW);
-  let y = 56;
-
-  labeledLine(doc, "Application Form No:", formNo, 14, y, 42, 130);
-  labeledLine(doc, "Date:", dateStr, 135, y, 12, 196);
-  y += 8;
-  labeledLine(doc, "Sourcing Executive / Agent Name:", extras.sourcingExec, 14, y, 58, 196);
-  y += 10;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.text("1. APPLICANT DETAILS", 14, y);
-  y += 4;
-  const box1Top = y;
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.3);
-  const box1Height = 46;
-  doc.rect(14, box1Top, pageW - 28, box1Height);
-  y += 7;
-  labeledLine(doc, "Sole / First Applicant Name:", customerName, 18, y, 52, 192); y += 8;
-  labeledLine(doc, "Co-Applicant Name (if any):", extras.coApplicant, 18, y, 52, 192); y += 8;
-  labeledLine(doc, "Father's / Spouse's Name:", extras.fatherSpouse, 18, y, 50, 192); y += 8;
-  labeledLine(doc, "Permanent Address:", extras.permAddress, 18, y, 38, 192); y += 8;
-  labeledLine(doc, "Correspondence Address:", extras.corrAddress, 18, y, 46, 192); y += 8;
-  labeledLine(doc, "Mobile No:", extras.phone, 18, y, 22, 100);
-  labeledLine(doc, "Email ID:", extras.email, 108, y, 20, 192);
-  y = box1Top + box1Height + 10;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.text("2. PROPERTY PREFERENCE & SELECTION", 14, y);
-  y += 5;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.text("Please select the property segment you are opting to book", 14, y);
-  y += 3;
-  const box2Top = y;
-  const box2Height = 34;
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.3);
-  doc.rect(14, box2Top, pageW - 28, box2Height);
-  y += 9;
-
-  const segMap = { Studio: "Studio Apartment", Office: "Office Space", Shop: "Shop Space", Showroom: "Showroom Space" };
-  const segments = ["Studio", "Office", "Shop", "Showroom"];
-  let segX = 18;
-  segments.forEach((seg) => {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9.5);
-    doc.text(segMap[seg], segX, y + 3);
-    drawCheckbox(doc, segX + doc.getTextWidth(segMap[seg]) + 3, y, unit.category === seg);
-    segX += doc.getTextWidth(segMap[seg]) + 14;
-  });
-  y += 11;
-  labeledLine(doc, "Specific Unit / Number:", unit.unit_label + " (" + unit.id + ")", 18, y, 46, 118);
-  labeledLine(doc, "Carpet Area (Sq.Ft):", unit.carpet, 124, y, 40, 188);
-  y += 10;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.text("Car Parking Requirement:", 18, y);
-  doc.text("Covered", 70, y);
-  drawCheckbox(doc, 85, y - 3.2, extras.parkingRequirement === "covered");
-  doc.text("( Nos", 95, y);
-  doc.setDrawColor(120,120,120);
-  doc.line(107, y + 0.8, 130, y + 0.8);
-  if (extras.parkingRequirement === "covered" && extras.parkingCount) {
-    doc.setFont("helvetica", "bold");
-    doc.text(String(extras.parkingCount), 110, y);
-    doc.setFont("helvetica", "normal");
-  }
-  doc.text(")", 131, y);
-  doc.text("None", 140, y);
-  drawCheckbox(doc, 152, y - 3.2, extras.parkingRequirement !== "covered");
-
-  drawFormFooter(doc, pageW, pageH);
-
-  // ============ PAGE 2 ============
-  doc.addPage();
-  drawFormHeader(doc, pageW);
-  y = 56;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.text("3. FINANCIALS & PAYMENT DETAILS", 14, y);
-  y += 4;
-  const box3Top = y;
-  const box3Height = 40;
-  doc.setDrawColor(...FORM_BROWN);
-  doc.setLineWidth(0.3);
-  doc.rect(14, box3Top, pageW - 28, box3Height);
-  y += 8;
-  labeledLine(doc, "Basic Sale Price (BSP): Rs :", fmtNum(costs.agreement_value), 18, y, 52, 192); y += 9;
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(8);
-  doc.setTextColor(90,90,90);
-  doc.text(`(All-in Total Package incl. Stamp Duty, Registration & GST: Rs. ${fmtNum(costs.package)})`, 18, y);
-  doc.setTextColor(0,0,0);
-  y += 7;
-  labeledLine(doc, "Booking Amount Paid: Rs :", extras.bookingAmountPaid ? fmtNum(extras.bookingAmountPaid) : "", 18, y, 52, 110);
-  labeledLine(doc, "( In Words ):", extras.bookingAmountPaid ? numberToWordsIndian(extras.bookingAmountPaid) + " Only" : "", 116, y, 22, 192);
-  y += 10;
-  const paymentModeText = extras.paymentMode ? `${extras.paymentMode}${extras.paymentRefNo ? " — " + extras.paymentRefNo : ""}` : "";
-  labeledLine(doc, "Payment Mode: Cheque / DD / NEFT / RTGS Ref No:", paymentModeText, 18, y, 88, 192);
-  y += 9;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9.5);
-  doc.text("Preferred Payment Plan:", 18, y);
-  doc.text("Down Payment Plan", 65, y);
-  drawCheckbox(doc, 100, y - 3.2, extras.paymentPlan === "down_payment");
-  doc.text("Construction Linked Plan", 112, y);
-  drawCheckbox(doc, 156, y - 3.2, extras.paymentPlan === "construction_linked");
-  y += 7;
-  doc.text("Flexi Plan", 65, y);
-  drawCheckbox(doc, 100, y - 3.2, extras.paymentPlan === "flexi");
-
-  y = box3Top + box3Height + 10;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.text("4. DECLARATION & ACKNOWLEDGEMENT", 14, y);
-  y += 6;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  const declaration = "I/We hereby declare that the particulars given above are true and correct to the best of my/our knowledge. I/We have read, understood, and accept the standard terms and conditions of allotment, payment schedules, and statutory guidelines associated with this project. I/We agree to pay the subsequent installments as per the chosen payment plan failing which the company reserves the right to take action as per the standard terms.";
-  const declLines = doc.splitTextToSize(declaration, pageW - 28);
-  doc.text(declLines, 14, y);
-  y += declLines.length * 4.2 + 18;
-
-  doc.setDrawColor(120,120,120);
-  doc.line(14, y, 90, y);
-  doc.line(115, y, 191, y);
-  doc.setFontSize(8.5);
-  doc.text("Primary Applicant Signature", 30, y + 5);
-  doc.text("Co-Applicant Signature", 133, y + 5);
-  y += 16;
-  labeledLine(doc, "Date:", dateStr, 14, y, 12, 80);
-  labeledLine(doc, "Place:", "", 115, y, 14, 191);
-  y += 10;
-
-  doc.setLineDashPattern([1, 1], 0);
-  doc.setDrawColor(150,150,150);
-  doc.line(14, y, pageW - 14, y);
-  doc.setLineDashPattern([], 0);
-  y += 8;
-
-  doc.setFillColor(...FORM_BROWN);
-  doc.rect(0, y, 48, 5.5, "F");
-  doc.setTextColor(255,255,255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
-  doc.text("FOR OFFICE USE ONLY", 4, y + 3.9);
-  doc.setTextColor(0,0,0);
-  y += 12;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Application Status:", 14, y);
-  doc.text("Accepted", 55, y);
-  drawCheckbox(doc, 73, y - 3.2, false);
-  doc.text("Rejected", 84, y);
-  drawCheckbox(doc, 101, y - 3.2, false);
-  labeledLine(doc, "Allotted Unit No:", unit.id, 116, y, 32, 191);
-  y += 9;
-  labeledLine(doc, "Verified By (Name & Sign):", "", 14, y, 48, 100);
-  labeledLine(doc, "Authorized Signatory:", "", 116, y, 38, 191);
-
-  drawFormFooter(doc, pageW, pageH);
-
-  // ============ PAGE 3 — Payment Schedule + Terms & Conditions ============
-  doc.addPage();
-  drawFormHeader(doc, pageW);
-  y = 56;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("Payment Schedule", 14, y);
-  y += 7;
-
-  doc.setFillColor(201,150,47);
-  doc.setTextColor(255,255,255);
-  doc.rect(14, y, pageW - 28, 7, "F");
-  doc.setFontSize(9);
-  doc.text("Stage", 18, y + 5);
-  doc.text("% of Package", 130, y + 5);
-  doc.text("Amount (Rs.)", 160, y + 5);
-  y += 7;
-
-  doc.setTextColor(0,0,0);
-  doc.setFont("helvetica", "normal");
-  PAYMENT_SCHEDULE.forEach((s, i) => {
-    doc.setFillColor(i % 2 === 0 ? 255 : 250, i % 2 === 0 ? 255 : 247, i % 2 === 0 ? 255 : 240);
-    doc.rect(14, y, pageW - 28, 7, "F");
-    doc.text(s.stage, 18, y + 5, { maxWidth: 108 });
-    doc.text(s.percent + "%", 130, y + 5);
-    doc.text(fmtNum(Math.round(costs.package * s.percent / 100)), 160, y + 5);
-    y += 7;
-  });
-
-  y += 12;
-  doc.setFillColor(...FORM_BROWN);
-  doc.rect(0, y, pageW, 6.8, "F");
-  doc.setTextColor(255,255,255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("Terms & Condition", pageW / 2, y + 4.8, { align: "center" });
-  doc.setTextColor(0,0,0);
-  y += 14;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  STANDARD_TERMS.forEach((t) => {
-    const lines = doc.splitTextToSize("•  " + t, pageW - 30);
-    if (y + lines.length * 4 > pageH - 22) { doc.addPage(); drawFormHeader(doc, pageW); y = 56; }
-    doc.text(lines, 16, y);
-    y += lines.length * 4 + 2;
-  });
-
-  drawFormFooter(doc, pageW, pageH);
-
-  const fname = `BookingForm_${unit.id}_${customerName.replace(/\s+/g,"_")}.pdf`;
-  doc.save(fname);
-}
 
 // ---------------------------------------------------------------------
 // ADMIN: EXPORT TO EXCEL

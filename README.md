@@ -11,7 +11,8 @@ directly on GitHub Pages.
 - **447 units** pre-loaded: 388 Studio/Hostel rooms, 54 Offices, 2 Showrooms, 3 Shops
 - **Three roles**: **Admin** (full control), **Site Head** (can edit any booking, same as admin), **Sales** (day-to-day booking)
 - **Live inventory grid**: Available / On Hold / Sold / Blocked, filterable by category, floor, status
-- **Booking flow**: capture full applicant, property, and payment details → auto-generates a 3-page PDF that replicates your official "Official Application for Booking / Allotment" form exactly (Applicant Details, Property Preference & Parking, Financials & Payment Details, Declaration & Signatures, For Office Use, Payment Schedule, Terms & Conditions)
+- **Booking flow**: capture full applicant, property, and payment details → opens an **on-screen preview** of the official "Official Application for Booking / Allotment" form (your exact HTML/CSS template — Applicant Details, Property Preference & Parking, Financials & Payment Details, Declaration & Signatures, For Office Use, Payment Schedule, Terms & Conditions). Nothing auto-downloads — click **Print / Save as PDF** in the preview when you're ready, and use your browser's print dialog to save as PDF.
+- **Inline unit price editing**: Admin can edit a unit's Agreement Value, Stamp Duty Rate, Stamp Duty, Registration, GST, and Total Package directly in the unit detail panel (live-recalculating as you type) and save with one click — this changes the unit's standard price for all future bookings.
 - **Bookings panel**: Admin + Site Head can view every booking and **edit** it (customer details, pricing); Admin can also cancel a booking (releases the unit back to Available)
 - **Audit Log** (Admin only): every booking edit, cancellation, unit status/price override, user-role change, and system reset is logged with **who did it and exactly what changed** (before/after values)
 - **Reset System** (Admin only): one button, behind a typed "RESET" confirmation, that sets every unit back to Available and cancels every active booking — fully logged in the Audit Log
@@ -74,7 +75,8 @@ const SUPABASE_ANON_KEY = "your-anon-public-key";
 |---|---|---|---|
 | View inventory grid | ✅ | ✅ | ✅ |
 | Place / release a Hold | ✅ | ✅ | ✅ |
-| Create a booking (generates the official Booking Form PDF) | ✅ | ✅ | ✅ |
+| Create a booking (opens the on-screen Booking Form preview) | ✅ | ✅ | ✅ |
+| Edit a unit's standard price (Agreement Value/Stamp Duty/GST/Package) | ❌ | ❌ | ✅ |
 | Reprint an existing booking's PDF | ❌ | ✅ | ✅ |
 | View Bookings panel | ❌ | ✅ | ✅ |
 | **Edit a booking** (customer details, pricing) | ❌ | ✅ | ✅ |
@@ -94,7 +96,8 @@ truston-inventory-system/
 ├── index.html
 ├── css/style.css
 ├── js/
-│   ├── config.js      ← project info, RERA no., payment schedule, T&Cs — EDIT THIS
+│   ├── config.js       ← project info, RERA no., payment schedule, T&Cs — EDIT THIS
+│   ├── formTemplate.js ← the official Booking/Allotment form (your HTML/CSS template), populated with live data
 │   └── app.js          ← all application logic
 ├── supabase/
 │   ├── schema.sql       ← run first
