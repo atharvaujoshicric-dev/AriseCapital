@@ -52,9 +52,10 @@ const FORM_CSS = `
   .office-use{ border-top:1px dashed var(--muted); margin-top:40px; padding-top:26px; position:relative; z-index:1; }
   .office-use .tag{ background:var(--brown); color:#fff; display:inline-block; padding:7px 18px; font-size:12.5px; font-weight:600; letter-spacing:0.5px; margin-bottom:22px; }
   .footer{ margin-top:auto; border-top:2px solid var(--brown); padding:16px 0 18px 0; display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:var(--text); position:relative; z-index:1; }
+  .footer .sales-office{ flex:1 1 auto; min-width:0; padding-right:18px; }
   .footer .sales-office b{ display:block; font-size:10.5px; }
-  .footer .partner-logos{ display:flex; align-items:center; gap:16px; }
-  .footer .partner-logos img{ height:30px; }
+  .footer .partner-logos{ display:flex; align-items:center; gap:16px; flex:0 0 auto; }
+  .footer .partner-logos img{ height:30px; display:block; }
   .tc-title-bar{ background:var(--brown); color:#fff; text-align:center; padding:8px 0; font-size:14px; font-weight:600; letter-spacing:1px; margin:0 0 18px 0; position:relative; z-index:1; }
   .tc-list{ font-size:11.5px; line-height:1.85; text-align:justify; padding-left:18px; margin:0; position:relative; z-index:1; }
   .tc-list li{ margin-bottom:11px; }

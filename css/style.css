@@ -141,10 +141,21 @@ select {
 .detail-content h3 { margin: 0 0 4px; color: var(--teal-dark); }
 .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; }
 .detail-row b { color: var(--text); }
-.detail-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: 13px; gap: 8px; }
+.detail-edit-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--border); font-size: 13px; gap: 8px; }
 .detail-edit-row span { white-space: nowrap; color: #555; }
-.detail-edit-row input, .detail-edit-row select { width: 130px; padding: 4px 6px; border: 1.5px solid var(--border); border-radius: 4px; font-size: 12px; text-align: right; }
-.detail-edit-row select { text-align: left; width: 140px; }
+.detail-edit-row input, .detail-edit-row select {
+  border: none; background: transparent; text-align: right; font-weight: 700; color: var(--text);
+  font-size: 13px; font-family: inherit; padding: 2px 4px; border-radius: 3px; cursor: text;
+  width: 130px; -webkit-appearance: none; appearance: none;
+}
+.detail-edit-row select { text-align: right; cursor: pointer; direction: rtl; }
+.detail-edit-row select option { direction: ltr; }
+.detail-edit-row input:hover, .detail-edit-row select:hover { background: rgba(0,0,0,0.04); }
+.detail-edit-row input:focus, .detail-edit-row select:focus {
+  outline: none; background: #fff8e8; box-shadow: inset 0 -2px 0 var(--gold);
+}
+.detail-edit-row input[readonly] { color: #888; font-weight: 600; cursor: default; }
+.detail-edit-row input[readonly]:hover { background: transparent; }
 .detail-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .admin-section { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--border); }
 .admin-section .sidebar-label { margin-bottom: 8px; }
@@ -161,6 +172,10 @@ select {
 .modal-body { padding: 20px; }
 .modal-body label { display: block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
 .modal-body input { width: 100%; padding: 9px 10px; border: 1.5px solid var(--border); border-radius: 6px; font-size: 14px; }
+.modal-body input[readonly], .modal-body select:disabled {
+  border: none; background: transparent; padding: 4px 0; font-weight: 700; color: var(--text);
+  border-bottom: 1px dashed var(--border);
+}
 .modal-footer { display: flex; gap: 8px; justify-content: flex-end; padding: 16px 20px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 .booking-unit-summary { background: var(--cream); padding: 10px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 6px; }
 .required { color: var(--sold); }

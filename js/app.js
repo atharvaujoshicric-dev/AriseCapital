@@ -272,7 +272,7 @@ function renderDetail() {
       <div class="detail-row"><span>Stamp Duty</span><b id="detStampDutyDisplay">₹${fmtNum(u.stamp_duty)}</b></div>
       <div class="detail-row"><span>Registration <span class="field-note">(fixed)</span></span><b>₹${fmtNum(REGISTRATION_FEE)}</b></div>
       <div class="detail-row"><span>GST <span class="field-note">(12%)</span></span><b id="detGstDisplay">₹${fmtNum(u.gst)}</b></div>
-      <div class="detail-row"><span>Total Package</span><b id="detPackageDisplay">₹${fmtNum(u.package)}</b></div>
+      <div class="detail-edit-row"><span>Total Package</span><input type="number" id="detPackage" value="${u.package}"></div>
       <button class="btn btn-outline btn-sm btn-block" style="margin-top:8px;" onclick="saveUnitPrice()">💾 Save Price Changes</button>
     `;
   } else {
@@ -326,31 +326,46 @@ function renderDetail() {
   }
 }
 
-// Only Agreement Value and Stamp Duty Rate are true inputs here — Stamp
-// Duty, GST, and the Package total are always derived from them, and
-// Registration is a fixed statutory fee. This is one-directional on
-// purpose: it must not be possible to back into an arbitrary stamp duty
-// by typing a package total, the way the booking-time calculator allows.
+// Agreement Value and Total Package are both true, mutually-editable
+// inputs; Stamp Duty and GST are always derived (never freely typed), and
+// Registration is always the fixed statutory fee. Editing Package solves
+// backwards for the Agreement Value that produces it, then re-derives
+// Stamp Duty/GST from that — so you still can never land on an arbitrary
+// stamp duty number, only ever 6% or 7% of whatever Agreement Value is
+// implied.
 function wireUnitPriceRecalc() {
   const agreementEl = document.getElementById("detAgreementValue");
   const rateEl = document.getElementById("detStampDutyRate");
   const stampDisplay = document.getElementById("detStampDutyDisplay");
   const gstDisplay = document.getElementById("detGstDisplay");
-  const pkgDisplay = document.getElementById("detPackageDisplay");
+  const pkgEl = document.getElementById("detPackage");
 
-  function recalc() {
+  function recalcFromAgreement() {
     const av = Number(agreementEl.value || 0);
     const rate = Number(rateEl.value || 7);
     const stamp = Math.round(av * rate / 100);
     const gst = Math.round(av * GST_RATE);
-    const pkg = av + stamp + REGISTRATION_FEE + gst;
     stampDisplay.textContent = "₹" + fmtNum(stamp);
     gstDisplay.textContent = "₹" + fmtNum(gst);
-    pkgDisplay.textContent = "₹" + fmtNum(pkg);
+    pkgEl.value = av + stamp + REGISTRATION_FEE + gst;
   }
 
-  agreementEl.oninput = recalc;
-  rateEl.onchange = recalc;
+  function recalcFromPackage() {
+    const pkg = Number(pkgEl.value || 0);
+    const rate = Number(rateEl.value || 7);
+    const av = Math.max(0, Math.round((pkg - REGISTRATION_FEE) / (1 + rate / 100 + GST_RATE)));
+    agreementEl.value = av;
+    const stamp = Math.round(av * rate / 100);
+    const gst = Math.round(av * GST_RATE);
+    stampDisplay.textContent = "₹" + fmtNum(stamp);
+    gstDisplay.textContent = "₹" + fmtNum(gst);
+    // pkgEl left exactly as typed — small rounding differences of a few
+    // rupees between components and the typed total are fine.
+  }
+
+  agreementEl.oninput = recalcFromAgreement;
+  rateEl.onchange = recalcFromAgreement;
+  pkgEl.oninput = recalcFromPackage;
 }
 
 async function saveUnitPrice() {
@@ -358,7 +373,7 @@ async function saveUnitPrice() {
   const rate = Number(document.getElementById("detStampDutyRate").value || 7);
   const stamp = Math.round(agreement * rate / 100);
   const gst = Math.round(agreement * GST_RATE);
-  const pkg = agreement + stamp + REGISTRATION_FEE + gst;
+  const pkg = Number(document.getElementById("detPackage").value || 0);
 
   const { error } = await sb.rpc("admin_update_unit_price", {
     p_unit_id: selectedUnit.id, p_agreement_value: agreement, p_stamp_duty: stamp,
@@ -415,7 +430,7 @@ function wireFinancialsRecalc(ids) {
   const gstEl = document.getElementById(ids.gst);
   const pkgEl = document.getElementById(ids.package);
 
-  function recalc() {
+  function recalcFromAgreement() {
     const av = Number(agreementEl.value || 0);
     const rate = Number(rateEl.value || 7);
     const stamp = Math.round(av * rate / 100);
@@ -426,8 +441,20 @@ function wireFinancialsRecalc(ids) {
     pkgEl.value = av + stamp + REGISTRATION_FEE + gst;
   }
 
-  agreementEl.oninput = recalc;
-  rateEl.onchange = recalc;
+  function recalcFromPackage() {
+    const pkg = Number(pkgEl.value || 0);
+    const rate = Number(rateEl.value || 7);
+    const av = Math.max(0, Math.round((pkg - REGISTRATION_FEE) / (1 + rate / 100 + GST_RATE)));
+    agreementEl.value = av;
+    stampEl.value = Math.round(av * rate / 100);
+    regEl.value = REGISTRATION_FEE;
+    gstEl.value = Math.round(av * GST_RATE);
+    // pkgEl left exactly as typed.
+  }
+
+  agreementEl.oninput = recalcFromAgreement;
+  rateEl.onchange = recalcFromAgreement;
+  pkgEl.oninput = recalcFromPackage;
 }
 
 function openBookingModal(previewOnly) {
