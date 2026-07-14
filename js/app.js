@@ -333,23 +333,36 @@ function wireFinancialsRecalc(ids) {
     const rate = Number(rateEl.value || 7);
     stampEl.value = Math.round(av * rate / 100);
     gstEl.value = Math.round(av * GST_RATE);
-    recalcPackage();
+    recalcPackageFromComponents();
   }
-  function recalcPackage() {
+  function recalcPackageFromComponents() {
     const av = Number(agreementEl.value || 0);
     const stamp = Number(stampEl.value || 0);
     const reg = Number(regEl.value || 0);
     const gst = Number(gstEl.value || 0);
     pkgEl.value = av + stamp + reg + gst;
   }
+  // Editing the Package directly solves backwards for what Agreement Value
+  // (and therefore Stamp Duty + GST, at the currently selected rate) would
+  // produce that package total: Package = AV*(1 + rate/100 + GST_RATE) + Registration.
+  function recalcFromPackage() {
+    const pkg = Number(pkgEl.value || 0);
+    const rate = Number(rateEl.value || 7);
+    const reg = Number(regEl.value || 0);
+    const av = Math.round((pkg - reg) / (1 + rate / 100 + GST_RATE));
+    agreementEl.value = av;
+    stampEl.value = Math.round(av * rate / 100);
+    gstEl.value = Math.round(av * GST_RATE);
+    // Leave pkgEl exactly as typed — small rounding differences (a few
+    // rupees) between components and the typed total are expected and fine.
+  }
 
   agreementEl.oninput = recalcFromAgreementValue;
   rateEl.onchange = recalcFromAgreementValue;
-  stampEl.oninput = recalcPackage;
-  regEl.oninput = recalcPackage;
-  gstEl.oninput = recalcPackage;
-  // pkgEl is intentionally left as a free-standing override — editing it
-  // directly does not back-propagate into the components above.
+  stampEl.oninput = recalcPackageFromComponents;
+  regEl.oninput = recalcPackageFromComponents;
+  gstEl.oninput = recalcPackageFromComponents;
+  pkgEl.oninput = recalcFromPackage;
 }
 
 const bookingFieldIds = {
@@ -862,23 +875,25 @@ function numberToWordsIndian(num) {
 // ---------------------------------------------------------------------
 function drawAriseLogo(doc, x, y, scale) {
   // Vector approximation of the ARISE CAPITAL triangle mark (no source
-  // logo file was provided — swap this for doc.addImage(...) with the
-  // real logo asset for a pixel-perfect match).
+  // logo file was provided — colors sampled from the actual PDF artwork:
+  // gold gradient triangle ~(130-195,100-178,50-100), dark wordmark ~(21,19,18).
+  // Swap for doc.addImage(...) with the real logo asset for pixel-perfect match.
   scale = scale || 1;
-  doc.setFillColor(20, 20, 20);
-  doc.triangle(x + 9*scale, y, x, y + 16*scale, x + 18*scale, y + 16*scale, "F");
-  doc.setFillColor(255,255,255);
-  doc.triangle(x + 9*scale, y + 4*scale, x + 4*scale, y + 14*scale, x + 14*scale, y + 14*scale, "F");
-  doc.setFillColor(20,20,20);
+  // Two-band fake gradient: lighter gold top-left, darker gold toward the base.
+  doc.setFillColor(195, 178, 101);
+  doc.triangle(x + 9*scale, y, x + 1*scale, y + 16*scale, x + 17*scale, y + 16*scale, "F");
+  doc.setFillColor(133, 104, 54);
+  doc.triangle(x + 9*scale, y + 7*scale, x + 4*scale, y + 16*scale, x + 14*scale, y + 16*scale, "F");
+  doc.setFillColor(21, 19, 18);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15 * scale);
   doc.text("A R I S E", x - 2*scale, y + 23*scale);
-  doc.setDrawColor(180,140,60);
+  doc.setDrawColor(...FORM_BROWN);
   doc.setLineWidth(0.3);
   doc.line(x - 2*scale, y + 25*scale, x + 34*scale, y + 25*scale);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7 * scale);
-  doc.setTextColor(120,120,120);
+  doc.setTextColor(140, 113, 63);
   doc.text("C A P I T A L", x + 1*scale, y + 29*scale);
   doc.setTextColor(0,0,0);
 }
@@ -907,8 +922,11 @@ function drawQRCode(doc, text, x, y, size) {
   }
 }
 
+// Exact brown/tan accent sampled from the source artwork (RGB 164,124,98).
+const FORM_BROWN = [164, 124, 98];
+
 function drawFormHeader(doc, pageW) {
-  drawAriseLogo(doc, 14, 10, 0.9);
+  drawAriseLogo(doc, 14, 6, 1.0);
 
   doc.setFontSize(7);
   doc.setFont("helvetica", "normal");
@@ -921,38 +939,43 @@ function drawFormHeader(doc, pageW) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
   doc.setTextColor(80,80,80);
-  doc.text("www.maharera.maharashtra.gov.in", pageW - 66, 22);
+  doc.text(RERA_WEBSITE, pageW - 66, 22);
   drawQRCode(doc, "https://maharera.maharashtra.gov.in/", pageW - 22, 8, 16);
 
-  doc.setDrawColor(180,140,60);
+  // Full-bleed gold line, edge to edge (measured y ≈ 43mm on the source PDF)
+  doc.setDrawColor(...FORM_BROWN);
   doc.setLineWidth(0.6);
-  doc.line(14, 34, pageW - 14, 34);
+  doc.line(0, 43, pageW, 43);
 
-  doc.setFillColor(150, 120, 90);
-  doc.rect(14, 39, 145, 8, "F");
+  // "OFFICIAL APPLICATION..." banner: centered, ~118mm wide (measured)
+  const bannerW = 118, bannerH = 6.5;
+  const bannerX = (pageW - bannerW) / 2;
+  doc.setFillColor(...FORM_BROWN);
+  doc.rect(bannerX, 43.3, bannerW, bannerH, "F");
   doc.setTextColor(255,255,255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text("OFFICIAL APPLICATION FOR BOOKING / ALLOTMENT", 18, 44.5);
+  doc.setFontSize(9.5);
+  doc.text("OFFICIAL APPLICATION FOR BOOKING / ALLOTMENT", pageW / 2, 43.3 + bannerH/2 + 1.2, { align: "center" });
   doc.setTextColor(0,0,0);
 }
 
 function drawFormFooter(doc, pageW, pageH) {
-  doc.setDrawColor(180,140,60);
-  doc.setLineWidth(0.4);
-  doc.line(14, pageH - 18, pageW - 14, pageH - 18);
+  // Full-bleed gold line above the footer (measured y ≈ 275.7mm)
+  doc.setDrawColor(...FORM_BROWN);
+  doc.setLineWidth(0.5);
+  doc.line(0, pageH - 21.2, pageW, pageH - 21.2);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(80,80,80);
   const lines = doc.splitTextToSize("Sales Office: " + SALES_OFFICE_NAME + ", " + SALES_OFFICE_ADDRESS, 130);
-  doc.text(lines, 14, pageH - 13);
+  doc.text(lines, 14, pageH - 15);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(0,0,0);
-  doc.text(PROJECT_TRUSTON_NAME, pageW - 55, pageH - 14);
+  doc.text(PROJECT_TRUSTON_NAME, pageW - 55, pageH - 16);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.5);
-  doc.text(PROJECT_TAGLINE, pageW - 55, pageH - 10.5);
+  doc.text(PROJECT_TAGLINE, pageW - 55, pageH - 12.5);
   doc.setTextColor(0,0,0);
 }
 
@@ -1008,7 +1031,7 @@ function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
   doc.text("1. APPLICANT DETAILS", 14, y);
   y += 4;
   const box1Top = y;
-  doc.setDrawColor(180,140,60);
+  doc.setDrawColor(...FORM_BROWN);
   doc.setLineWidth(0.3);
   const box1Height = 46;
   doc.rect(14, box1Top, pageW - 28, box1Height);
@@ -1032,6 +1055,8 @@ function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
   y += 3;
   const box2Top = y;
   const box2Height = 34;
+  doc.setDrawColor(...FORM_BROWN);
+  doc.setLineWidth(0.3);
   doc.rect(14, box2Top, pageW - 28, box2Height);
   y += 9;
 
@@ -1079,6 +1104,8 @@ function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
   y += 4;
   const box3Top = y;
   const box3Height = 40;
+  doc.setDrawColor(...FORM_BROWN);
+  doc.setLineWidth(0.3);
   doc.rect(14, box3Top, pageW - 28, box3Height);
   y += 8;
   labeledLine(doc, "Basic Sale Price (BSP): Rs :", fmtNum(costs.agreement_value), 18, y, 52, 192); y += 9;
@@ -1134,12 +1161,12 @@ function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
   doc.setLineDashPattern([], 0);
   y += 8;
 
-  doc.setFillColor(150, 120, 90);
-  doc.rect(14, y, 70, 6, "F");
+  doc.setFillColor(...FORM_BROWN);
+  doc.rect(0, y, 48, 5.5, "F");
   doc.setTextColor(255,255,255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.text("FOR OFFICE USE ONLY", 17, y + 4.2);
+  doc.text("FOR OFFICE USE ONLY", 4, y + 3.9);
   doc.setTextColor(0,0,0);
   y += 12;
 
@@ -1188,12 +1215,12 @@ function generateBookingFormPDF(unit, customerName, costs, extras, bookingId) {
   });
 
   y += 12;
-  doc.setFillColor(150, 120, 90);
-  doc.rect(14, y, pageW - 28, 8, "F");
+  doc.setFillColor(...FORM_BROWN);
+  doc.rect(0, y, pageW, 6.8, "F");
   doc.setTextColor(255,255,255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("Terms & Condition", pageW / 2 - 22, y + 5.5);
+  doc.text("Terms & Condition", pageW / 2, y + 4.8, { align: "center" });
   doc.setTextColor(0,0,0);
   y += 14;
 
